@@ -1,0 +1,8 @@
+{
+  "name": "Remix SI-KGB Bawaslu Subang",
+  "description": "Sistem Informasi Pengajuan Kenaikan Gaji Berkala Bawaslu Kabupaten Subang dengan verifikasi digital, manajemen pegawai, dan notifikasi real-time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
