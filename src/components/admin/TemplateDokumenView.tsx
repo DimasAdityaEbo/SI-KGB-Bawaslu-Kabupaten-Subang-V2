@@ -7,7 +7,6 @@ import {
   Eye,
   Edit2,
   Trash2,
-  Copy,
   Download,
   Loader2,
   X,
@@ -74,6 +73,11 @@ const VARIABLE_TAGS = [
   { tag: '{TAHUN}', label: 'Tahun Berjalan' },
   { tag: '{BULAN}', label: 'Bulan Berjalan' },
   { tag: '{BULAN_PADDED}', label: 'Bulan (2 Digit)' },
+  { tag: '{NO_PENGAJUAN}', label: 'Nomor Pengajuan / Registrasi' },
+  { tag: '{PERIHAL}', label: 'Perihal Surat / Usulan' },
+  { tag: '{EMAIL_PEMOHON}', label: 'Email Pemohon' },
+  { tag: '{NO_HP_PEMOHON}', label: 'No. WhatsApp / HP Pemohon' },
+  { tag: '{STATUS_PENGAJUAN}', label: 'Status Pengajuan' },
 ];
 
 export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
@@ -142,7 +146,8 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
 
   const loadTemplates = async () => {
     const list = await getTemplatesList();
-    setTemplates(list);
+    // Exclude SK template from template list
+    setTemplates(list.filter((t) => t.id !== 'tmpl-sk-kgb' && t.kategori !== 'sk_kgb'));
   };
 
   useEffect(() => {
@@ -155,23 +160,6 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
       setSamplePegawaiId(pegawaiList[0].id);
     }
   }, [pegawaiList, samplePegawaiId]);
-
-  const handleOpenCreate = () => {
-    setEditingTemplate(null);
-    setFormNama('');
-    setFormDeskripsi('');
-    setFormKategori('surat_pengantar');
-    setFormFormatNomor('045.2/KP.04.00/JB-22/{BULAN}/{TAHUN}');
-    setFormJudulDokumen('SURAT DINAS RESMI');
-    setFormIsiKonten(
-      `Dengan ini disampaikan kelengkapan berkas usulan Kenaikan Gaji Berkala (KGB) untuk pegawai:\n\nNama: {NAMA_PEGAWAI}\nNIP: {NIP}\nJabatan: {JABATAN}\nUnit Kerja: {UNIT_KERJA}\n\nDemikian surat ini dibuat untuk dapat dipergunakan sebagaimana mestinya.`
-    );
-    setFormPejabatNama('H. TATANG KOSWARA, S.Sos., M.Si');
-    setFormPejabatJabatan('Kepala Sekretariat Bawaslu Kabupaten Subang');
-    setFormPejabatNip('197405121998031002');
-    setFormTembusan('1. Ketua Bawaslu Kabupaten Subang\n2. Arsip Kepegawaian');
-    setIsEditorOpen(true);
-  };
 
   const handleOpenEdit = (t: TemplateDokumen) => {
     setEditingTemplate(t);
@@ -186,20 +174,6 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
     setFormPejabatNip(t.penandatanganNip);
     setFormTembusan((t.tembusan || []).join('\n'));
     setIsEditorOpen(true);
-  };
-
-  const handleDuplicate = async (t: TemplateDokumen) => {
-    const duplicated: TemplateDokumen = {
-      ...t,
-      id: `tmpl-${Date.now()}`,
-      nama: `${t.nama} (Salinan)`,
-      isDefault: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    await saveTemplate(duplicated);
-    await loadTemplates();
-    showToast(`Template disalin sebagai "${duplicated.nama}"`);
   };
 
   const handleConfirmDelete = async () => {
@@ -328,6 +302,13 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
     content = content.replace(/\{NIP_PEJABAT\}/g, template.penandatanganNip);
     content = content.replace(/\{TAHUN\}/g, String(now.getFullYear()));
     content = content.replace(/\{BULAN\}/g, String(now.getMonth() + 1));
+    content = content.replace(/\{BULAN_PADDED\}/g, String(now.getMonth() + 1).padStart(2, '0'));
+    content = content.replace(/\{NO_PENGAJUAN\}/g, nomorSurat);
+    content = content.replace(/\{NOMOR_REGISTRASI\}/g, nomorSurat);
+    content = content.replace(/\{PERIHAL\}/g, 'Usulan Kenaikan Gaji Berkala (KGB)');
+    content = content.replace(/\{EMAIL_PEMOHON\}/g, p.email || '');
+    content = content.replace(/\{NO_HP_PEMOHON\}/g, p.noHp || '');
+    content = content.replace(/\{STATUS_PENGAJUAN\}/g, 'Diproses');
 
     return {
       nomorSurat,
@@ -398,15 +379,6 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
               <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
               <span>Reset Standar</span>
             </button>
-
-            {/* Buat Template Baru Button */}
-            <button
-              onClick={handleOpenCreate}
-              className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition shadow"
-            >
-              <Plus className="h-4 w-4 text-emerald-400" />
-              <span>Buat Template Baru</span>
-            </button>
           </div>
         </div>
 
@@ -442,9 +414,11 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
             onChange={(e) => setKategoriFilter(e.target.value)}
             className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:border-slate-900 focus:outline-none shadow-2xs"
           >
-            <option value="ALL">Semua Kategori (Surat Pengantar &amp; Tanda Terima)</option>
-            <option value="surat_pengantar">Surat Pengantar</option>
-            <option value="tanda_terima">Tanda Terima</option>
+            <option value="ALL">Semua Kategori Naskah Dinas</option>
+            <option value="surat_pengantar">Surat Pengantar KGB</option>
+            <option value="tanda_terima">Bukti Tanda Terima</option>
+            <option value="disposisi">Lembar Disposisi</option>
+            <option value="surat_keterangan">Surat Keterangan</option>
           </select>
         </div>
       </div>
@@ -456,7 +430,7 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
             <FileText className="mx-auto h-8 w-8 text-slate-400 mb-2" />
             <p className="font-semibold text-slate-700">Tidak ada template dokumen yang sesuai dengan pencarian.</p>
             <p className="text-[11px] text-slate-400 mt-1">
-              Silakan buat template baru, impor berkas Word (.docx), atau tekan Reset Standar.
+              Silakan periksa kata kunci pencarian atau tekan Reset Standar untuk memulihkan template bawaan.
             </p>
             <div className="mt-4 flex items-center justify-center gap-2">
               <button
@@ -530,13 +504,6 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
 
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => handleDuplicate(item)}
-                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
-                      title="Duplikasi Template"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
-                    <button
                       onClick={() => handleOpenEdit(item)}
                       className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition"
                       title="Ubah Template"
@@ -569,7 +536,7 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
                 <FileCode className="h-5 w-5 text-slate-700" />
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
-                    {editingTemplate ? `Ubah Template Dokumen: ${editingTemplate.nama}` : 'Buat Template Dokumen Baru'}
+                    Ubah Template Dokumen: {editingTemplate?.nama || ''}
                   </h3>
                   <p className="text-[11px] text-slate-500">
                     Sesuaikan judul, isi naskah, format penomoran, dan data penandatangan resmi.
@@ -617,6 +584,9 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
                   >
                     <option value="surat_pengantar">Surat Pengantar (ke Bawaslu Provinsi / Instansi)</option>
                     <option value="tanda_terima">Bukti Tanda Terima Pengajuan Berkas</option>
+                    <option value="disposisi">Lembar Disposisi Kasubag Administrasi</option>
+                    <option value="surat_keterangan">Surat Keterangan Kepegawaian</option>
+                    <option value="lainnya">Format Naskah Lainnya</option>
                   </select>
                 </div>
 

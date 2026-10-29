@@ -58,7 +58,7 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
 
   // Print modal state
   const [printModalOpen, setPrintModalOpen] = useState(false);
-  const [printMode, setPrintMode] = useState<'surat_pengantar' | 'tanda_terima'>('tanda_terima');
+  const [printMode, setPrintMode] = useState<'surat_pengantar' | 'tanda_terima' | 'sk_kgb'>('tanda_terima');
 
   // Delete pengajuan state
   const [deleteTarget, setDeleteTarget] = useState<PengajuanKGB | null>(null);
@@ -99,7 +99,7 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
     if (onClearSelectedPengajuan) onClearSelectedPengajuan();
   };
 
-  const handleOpenPrint = (mode: 'surat_pengantar' | 'tanda_terima') => {
+  const handleOpenPrint = (mode: 'surat_pengantar' | 'tanda_terima' | 'sk_kgb') => {
     setPrintMode(mode);
     setPrintModalOpen(true);
   };
@@ -278,6 +278,20 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {item.status === 'disetujui' && item.dokumenSkKgbDiterbitkan && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadDokumenFile(item.dokumenSkKgbDiterbitkan!, item);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 font-semibold text-emerald-800 hover:bg-emerald-100 shadow-2xs transition"
+                            title="Unduh SK KGB Resmi"
+                          >
+                            <Download className="h-3.5 w-3.5 text-emerald-700" />
+                            <span>Unduh SK</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => handleOpenDetail(item)}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 shadow-2xs"
@@ -436,6 +450,81 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Banner Dokumen SK KGB Diterbitkan */}
+              {activePengajuan.status === 'disetujui' && (
+                <div className="rounded-xl border-2 border-emerald-300 bg-linear-to-r from-emerald-50 via-teal-50 to-emerald-50 p-4 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <CheckCircle2 className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-emerald-950 text-sm">
+                            Surat Keputusan (SK) KGB Resmi Diterbitkan
+                          </h4>
+                          <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide">
+                            Resmi
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">
+                          {activePengajuan.dokumenSkKgbDiterbitkan
+                            ? `Dokumen: ${activePengajuan.dokumenSkKgbDiterbitkan.namaFile} (${activePengajuan.dokumenSkKgbDiterbitkan.ukuranFile})`
+                            : 'Surat Keputusan Kenaikan Gaji Berkala Anda telah disahkan dan disetujui.'}
+                        </p>
+                        {activePengajuan.nomorSkKgbDiterbitkan && (
+                          <p className="font-mono text-[11px] font-semibold text-emerald-900 mt-1">
+                            No. SK: {activePengajuan.nomorSkKgbDiterbitkan}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                      {activePengajuan.dokumenSkKgbDiterbitkan ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (activePengajuan.dokumenSkKgbDiterbitkan) {
+                                setViewingDoc(activePengajuan.dokumenSkKgbDiterbitkan);
+                                setIsDocViewerOpen(true);
+                              }
+                            }}
+                            className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-800 transition shadow-xs"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            <span>Lihat SK</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (activePengajuan.dokumenSkKgbDiterbitkan) {
+                                downloadDokumenFile(activePengajuan.dokumenSkKgbDiterbitkan, activePengajuan);
+                              }
+                            }}
+                            className="flex items-center gap-1.5 rounded-lg border border-emerald-400 bg-white px-3.5 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50 transition shadow-xs"
+                            title="Unduh Berkas SK KGB Resmi"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            <span>Unduh SK</span>
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPrint('surat_pengantar')}
+                          className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-800 transition shadow-xs"
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                          <span>Cetak SK Pengantar</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Verifier Note if any */}
               {activePengajuan.catatanVerifikator && (
@@ -644,6 +733,52 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Dokumen SK KGB Resmi Diterbitkan jika ada */}
+                  {activePengajuan.dokumenSkKgbDiterbitkan && (
+                    <div className="rounded-lg border-2 border-emerald-300 bg-emerald-50/70 p-3 flex flex-col justify-between sm:col-span-2">
+                      <div>
+                        <div className="flex items-center gap-1.5 text-emerald-800 font-bold mb-1">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          <span>Dokumen SK KGB Diterbitkan</span>
+                        </div>
+                        <p className="text-[11px] text-slate-800 font-semibold truncate" title={activePengajuan.dokumenSkKgbDiterbitkan.namaFile}>
+                          {activePengajuan.dokumenSkKgbDiterbitkan.namaFile}
+                        </p>
+                        <p className="text-[10px] text-emerald-700 font-medium">
+                          {activePengajuan.dokumenSkKgbDiterbitkan.ukuranFile} • Resmi Diterbitkan
+                        </p>
+                      </div>
+                      <div className="mt-2.5 flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (activePengajuan.dokumenSkKgbDiterbitkan) {
+                              setViewingDoc(activePengajuan.dokumenSkKgbDiterbitkan);
+                              setIsDocViewerOpen(true);
+                            }
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1 rounded bg-emerald-700 py-1 text-[11px] font-semibold text-white hover:bg-emerald-800 transition"
+                        >
+                          <Eye className="h-3 w-3" />
+                          <span>Lihat Dokumen</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (activePengajuan.dokumenSkKgbDiterbitkan) {
+                              downloadDokumenFile(activePengajuan.dokumenSkKgbDiterbitkan, activePengajuan);
+                            }
+                          }}
+                          className="flex items-center justify-center gap-1 rounded border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-50 transition"
+                          title="Unduh Berkas"
+                        >
+                          <Download className="h-3 w-3" />
+                          <span>Unduh</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -663,7 +798,7 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
                   <div />
                 )}
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-slate-700 mr-1">Cetak Dokumen:</span>
                   <button
                     onClick={() => handleOpenPrint('tanda_terima')}
@@ -673,13 +808,22 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
                     <span>Tanda Terima Digital</span>
                   </button>
                   {activePengajuan.status === 'disetujui' && (
-                    <button
-                      onClick={() => handleOpenPrint('surat_pengantar')}
-                      className="flex items-center gap-1.5 rounded-lg bg-indigo-700 hover:bg-indigo-800 px-3.5 py-1.5 text-xs font-semibold text-white transition shadow-xs"
-                    >
-                      <Printer className="h-3.5 w-3.5" />
-                      <span>Cetak Surat Pengantar KGB</span>
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleOpenPrint('surat_pengantar')}
+                        className="flex items-center gap-1.5 rounded-lg bg-indigo-700 hover:bg-indigo-800 px-3.5 py-1.5 text-xs font-semibold text-white transition shadow-xs"
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                        <span>Cetak Surat Pengantar</span>
+                      </button>
+                      <button
+                        onClick={() => handleOpenPrint('sk_kgb')}
+                        className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-1.5 text-xs font-bold text-emerald-800 transition shadow-2xs"
+                      >
+                        <Printer className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>Cetak SK KGB</span>
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

@@ -8,6 +8,7 @@ import {
   TemplateDokumen,
   KopSuratConfig,
   TandaTanganCapConfig,
+  UserRole,
 } from '../types';
 import {
   INITIAL_PEGAWAI,
@@ -44,6 +45,9 @@ export function safeLocalStorageSet(key: string, data: any): void {
           }
           if (copy.skGajiBerkalaTerakhir && copy.skGajiBerkalaTerakhir.fileData) {
             copy.skGajiBerkalaTerakhir = { ...copy.skGajiBerkalaTerakhir, fileData: undefined };
+          }
+          if (copy.dokumenSkKgbDiterbitkan && copy.dokumenSkKgbDiterbitkan.fileData) {
+            copy.dokumenSkKgbDiterbitkan = { ...copy.dokumenSkKgbDiterbitkan, fileData: undefined };
           }
           return copy;
         });
@@ -285,7 +289,7 @@ export async function getPengajuanList(): Promise<PengajuanKGB[]> {
             tanggalVerifikasi: d.tanggal_verifikasi || d.tanggalVerifikasi,
             nomorSkKgbDiterbitkan: d.nomor_sk_kgb_diterbitkan || d.nomorSkKgbDiterbitkan,
             tanggalSkDiterbitkan: d.tanggal_sk_diterbitkan || d.tanggalSkDiterbitkan,
-            dokumenSkKgbDiterbitkan: d.dokumen_sk_kgb_diterbitkan || d.dokumenSkKgbDiterbitkan || d.sk_gaji_berkala_terakhir || d.skGajiBerkalaTerakhir,
+            dokumenSkKgbDiterbitkan: d.dokumen_sk_kgb_diterbitkan || d.dokumenSkKgbDiterbitkan || undefined,
           };
         });
       }
@@ -314,6 +318,9 @@ export async function savePengajuan(item: PengajuanKGB): Promise<PengajuanKGB> {
     }
     if (item.skGajiBerkalaTerakhir?.fileData) {
       await saveDocumentBinary(item.skGajiBerkalaTerakhir.id, item.skGajiBerkalaTerakhir.fileData);
+    }
+    if (item.dokumenSkKgbDiterbitkan?.fileData) {
+      await saveDocumentBinary(item.dokumenSkKgbDiterbitkan.id, item.dokumenSkKgbDiterbitkan.fileData);
     }
   } catch (e) {
     console.warn('Could not save binary to IndexedDB:', e);
@@ -360,14 +367,12 @@ export async function savePengajuan(item: PengajuanKGB): Promise<PengajuanKGB> {
         tanggal_verifikasi: item.tanggalVerifikasi ?? null,
         nomor_sk_kgb_diterbitkan: item.nomorSkKgbDiterbitkan ?? null,
         tanggal_sk_diterbitkan: item.tanggalSkDiterbitkan ?? null,
-        ...(item.dokumenSkKgbDiterbitkan
+        dokumen_sk_kgb_diterbitkan: item.dokumenSkKgbDiterbitkan
           ? {
-              dokumen_sk_kgb_diterbitkan: {
-                ...item.dokumenSkKgbDiterbitkan,
-                fileData: undefined,
-              },
+              ...item.dokumenSkKgbDiterbitkan,
+              fileData: undefined,
             }
-          : {}),
+          : null,
       };
 
       const { error } = await supabase.from('pengajuan_kgb').upsert(dbPayload);
@@ -459,17 +464,37 @@ export async function deletePengajuan(id: string): Promise<boolean> {
 
 // ======================== USERS REPOSITORY ========================
 export async function getUsersList(): Promise<User[]> {
+  let localUsers: User[] = [];
+  try {
+    const raw = localStorage.getItem(KEYS.USERS);
+    localUsers = raw ? JSON.parse(raw) : INITIAL_USERS;
+  } catch (e) {
+    localUsers = INITIAL_USERS;
+  }
+
+  // Ensure default kasubag user exists in localUsers if not already present
+  if (!localUsers.some((u) => u.role === 'kasubag' || u.username === 'kasubag')) {
+    const defaultKasubag = INITIAL_USERS.find((u) => u.role === 'kasubag');
+    if (defaultKasubag) {
+      localUsers.push(defaultKasubag);
+      safeLocalStorageSet(KEYS.USERS, localUsers);
+    }
+  }
+
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
       const { data, error } = await supabase.from('users').select('*');
-      if (error) throw new Error(error.message);
-      if (data) {
-        return data.map((d) => ({
+      if (error) {
+        console.warn('Supabase fetch users warning:', error.message);
+        return localUsers;
+      }
+      if (data && data.length > 0) {
+        const remoteUsers: User[] = data.map((d) => ({
           id: d.id,
           username: d.username,
           password: d.password,
-          role: d.role,
+          role: d.role as UserRole,
           pegawaiId: d.pegawai_id || d.pegawaiId,
           namaLengkap: d.nama_lengkap || d.namaLengkap,
           email: d.email,
@@ -477,54 +502,79 @@ export async function getUsersList(): Promise<User[]> {
           createdAt: d.created_at || d.createdAt,
           lastLogin: d.last_login || d.lastLogin,
         }));
+
+        // Merge: keep remote users, plus any local users not yet synced
+        const merged = [...remoteUsers];
+        for (const localUser of localUsers) {
+          if (!merged.some((u) => u.id === localUser.id || u.username.toLowerCase() === localUser.username.toLowerCase())) {
+            merged.push(localUser);
+          }
+        }
+        return merged;
       }
     } catch (e) {
-      console.error('Supabase users fetch error:', e);
-      throw e;
+      console.warn('Supabase users fetch error, fallback to local storage:', e);
+      return localUsers;
     }
   }
 
-  try {
-    const raw = localStorage.getItem(KEYS.USERS);
-    return raw ? JSON.parse(raw) : INITIAL_USERS;
-  } catch (e) {
-    return INITIAL_USERS;
-  }
+  return localUsers;
 }
 
 export async function saveUser(user: User): Promise<User> {
+  // 1. Always save to local storage first so the user can immediately login and use the account
+  try {
+    let current: User[] = [];
+    const raw = localStorage.getItem(KEYS.USERS);
+    current = raw ? JSON.parse(raw) : INITIAL_USERS;
+    const index = current.findIndex((u) => u.id === user.id);
+    let updated: User[];
+    if (index >= 0) {
+      updated = [...current];
+      updated[index] = user;
+    } else {
+      updated = [user, ...current];
+    }
+    safeLocalStorageSet(KEYS.USERS, updated);
+  } catch (e) {
+    console.warn('Safe localStorage set user error:', e);
+  }
+
+  // 2. Sync to Supabase if connected
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
       const payload = {
         id: user.id,
-        username: user.username,
+        username: user.username.trim().toLowerCase(),
         password: user.password,
         role: user.role,
-        pegawai_id: user.pegawaiId,
+        pegawai_id: user.pegawaiId || null,
         nama_lengkap: user.namaLengkap,
         email: user.email,
         status: user.status,
-        last_login: user.lastLogin,
+        last_login: user.lastLogin || null,
       };
       const { error } = await supabase.from('users').upsert(payload);
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.warn('Supabase save user warning:', error);
+        if (
+          error.code === '23514' ||
+          error.message?.includes('users_role_check') ||
+          error.message?.includes('violates check constraint')
+        ) {
+          throw new Error(
+            `KASUBAG_CHECK_CONSTRAINT: Database Supabase Anda masih menggunakan aturan constraint lama yang belum mengizinkan role 'kasubag'. Akun telah berhasil disimpan di sesi lokal sehingga dapat langsung digunakan untuk login.`
+          );
+        }
+        throw new Error(`${error.code || 'DB_ERROR'}: ${error.message}`);
+      }
     } catch (e) {
       console.warn('Supabase save user error:', e);
       throw e;
     }
   }
 
-  const current = await getUsersList();
-  const index = current.findIndex((u) => u.id === user.id);
-  let updated: User[];
-  if (index >= 0) {
-    updated = [...current];
-    updated[index] = user;
-  } else {
-    updated = [user, ...current];
-  }
-  safeLocalStorageSet(KEYS.USERS, updated);
   return user;
 }
 
@@ -720,35 +770,35 @@ export async function addEmailLog(log: EmailDispatchLog): Promise<void> {
 export async function getTemplatesList(): Promise<TemplateDokumen[]> {
   try {
     const raw = localStorage.getItem(KEYS.TEMPLATES);
-    if (!raw) return INITIAL_TEMPLATES;
+    if (!raw) {
+      safeLocalStorageSet(KEYS.TEMPLATES, INITIAL_TEMPLATES);
+      return INITIAL_TEMPLATES;
+    }
     const parsed: TemplateDokumen[] = JSON.parse(raw);
-    const defaultPengantar = INITIAL_TEMPLATES.find((template) => template.id === 'tmpl-pengantar-provinsi');
     let migrated = false;
-    const currentTemplates = parsed.map((template) => {
-      if (
-        defaultPengantar &&
-        template.id === defaultPengantar.id &&
-        template.isDefault &&
-        template.isiKonten.startsWith(
-          'Bersama ini kami sampaikan dengan hormat kelengkapan berkas usulan Kenaikan Gaji Berkala'
-        )
-      ) {
-        migrated = true;
-        return {
-          ...template,
-          ...defaultPengantar,
-          createdAt: template.createdAt,
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      return template;
-    });
-    if (migrated) safeLocalStorageSet(KEYS.TEMPLATES, currentTemplates);
 
-    const filtered = currentTemplates.filter(
-      (t) => t.kategori === 'surat_pengantar' || t.kategori === 'tanda_terima'
+    // Filter out SK template if previously stored in localStorage
+    let currentTemplates = parsed.filter(
+      (t) => t.id !== 'tmpl-sk-kgb' && t.kategori !== 'sk_kgb'
     );
-    return filtered.length > 0 ? filtered : INITIAL_TEMPLATES;
+    if (currentTemplates.length !== parsed.length) {
+      migrated = true;
+    }
+
+    // Ensure all prepared default templates exist
+    for (const initTmpl of INITIAL_TEMPLATES) {
+      const existingIdx = currentTemplates.findIndex((t) => t.id === initTmpl.id);
+      if (existingIdx === -1) {
+        currentTemplates.push(initTmpl);
+        migrated = true;
+      }
+    }
+
+    if (migrated) {
+      safeLocalStorageSet(KEYS.TEMPLATES, currentTemplates);
+    }
+
+    return currentTemplates.length > 0 ? currentTemplates : INITIAL_TEMPLATES;
   } catch (e) {
     return INITIAL_TEMPLATES;
   }
@@ -790,9 +840,9 @@ export const DEFAULT_KOP_SURAT: KopSuratConfig = {
   namaInstansiUtama: 'BADAN PENGAWAS PEMILIHAN UMUM',
   namaInstansiSub: 'KABUPATEN SUBANG',
   unitKerja: 'SEKRETARIAT',
-  alamatLengkap: 'Jl. Veteran No. 12, Kel. Dangdeur, Kec. Subang, Kabupaten Subang, Jawa Barat 41211',
-  teleponFaks: 'Telp: (0260) 417890 · Faks: (0260) 417891',
-  emailWebsite: 'Laman: subang.bawaslu.go.id · Pos-el: bawaslukabsubang@gmail.com',
+  alamatLengkap: 'Jl. Palabuan No. 9, Kel. Sukamelang, Kec. Subang, Kabupaten Subang, Jawa Barat 41211',
+  teleponFaks: 'Telepon: (0260) 4242353',
+  emailWebsite: 'Pos-el: set.subangkab@bawaslu.go.id · Laman: subang.bawaslu.go.id',
   kodePos: '41211',
   logoUrl: '',
   logoWidthPx: 80,
@@ -863,10 +913,10 @@ export const DEFAULT_TTD_CAP: TandaTanganCapConfig = {
   kota: 'Subang',
   tandaTanganUrl: DEFAULT_TANDA_TANGAN_SVG,
   tandaTanganWidthPx: 140,
-  tampilkanTandaTangan: true,
+  tampilkanTandaTangan: false,
   capUrl: DEFAULT_CAP_BAWASLU_SVG,
   capWidthPx: 120,
-  tampilkanCap: true,
+  tampilkanCap: false,
   posisiCap: 'tumpang_kiri',
   opacityCap: 0.88,
 
@@ -877,7 +927,7 @@ export const DEFAULT_TTD_CAP: TandaTanganCapConfig = {
     nip: '199206142019031004',
     tandaTanganUrl: DEFAULT_TANDA_TANGAN_KASUBAG_SVG,
     tandaTanganWidthPx: 135,
-    tampilkanTandaTangan: true,
+    tampilkanTandaTangan: false,
   },
 
   // Format tata letak tanda tangan pada dokumen cetak (tunggal / tanpa verifikator ganda)
@@ -892,9 +942,12 @@ export function getTandaTanganCapConfig(): TandaTanganCapConfig {
     return {
       ...DEFAULT_TTD_CAP,
       ...parsed,
+      tampilkanTandaTangan: false,
+      tampilkanCap: false,
       adminKasubag: {
         ...DEFAULT_TTD_CAP.adminKasubag,
         ...(parsed.adminKasubag || {}),
+        tampilkanTandaTangan: false,
       },
       modeTampilanDokumen: 'pimpinan_saja',
     };

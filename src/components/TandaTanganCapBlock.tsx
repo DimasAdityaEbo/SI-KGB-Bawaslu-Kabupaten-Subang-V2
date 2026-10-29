@@ -32,8 +32,8 @@ export const TandaTanganCapBlock: React.FC<TandaTanganCapBlockProps> = ({
   align = 'right',
   isCompact = false,
   className = '',
-  hideCap = false,
-  hideSignature = false,
+  hideCap = true,
+  hideSignature = true,
   mode = 'auto',
   showDualSignatures,
   leftTitle,
@@ -66,7 +66,7 @@ export const TandaTanganCapBlock: React.FC<TandaTanganCapBlockProps> = ({
     nip: '199206142019031004',
     tandaTanganUrl: '',
     tandaTanganWidthPx: 135,
-    tampilkanTandaTangan: true,
+    tampilkanTandaTangan: false,
   };
 
   const defaultDate = new Date().toLocaleDateString('id-ID', {
@@ -74,7 +74,11 @@ export const TandaTanganCapBlock: React.FC<TandaTanganCapBlockProps> = ({
     month: 'long',
     year: 'numeric',
   });
-  const tanggal = tanggalText || cfg.tanggalText || defaultDate;
+  const rawTanggal = tanggalText || cfg.tanggalText || defaultDate;
+  // Clean duplicate city name if already present in rawTanggal (e.g., "Subang, 28 Oktober 2026")
+  const regexKota = new RegExp(`^(?:${kota}[,\\s]+)+`, 'i');
+  const cleanTanggal = rawTanggal.replace(regexKota, '').trim();
+  const tanggalLine = cleanTanggal ? `${kota}, ${cleanTanggal}` : `${kota}, ${rawTanggal}`;
 
   // Determine effective display mode
   const effectiveMode =
@@ -92,7 +96,7 @@ export const TandaTanganCapBlock: React.FC<TandaTanganCapBlockProps> = ({
   const capWidth = cfg.capWidthPx || 120;
   const capOpacity = cfg.opacityCap ?? 0.88;
 
-  const showKasubagTtd = kasubag.tampilkanTandaTangan && !!kasubag.tandaTanganUrl;
+  const showKasubagTtd = !hideSignature && kasubag.tampilkanTandaTangan && !!kasubag.tandaTanganUrl;
   const kasubagTtdWidth = kasubag.tandaTanganWidthPx || 135;
 
   // ===================== DUAL SIGNATURES (KASUBAG & PIMPINAN) =====================
@@ -123,9 +127,7 @@ export const TandaTanganCapBlock: React.FC<TandaTanganCapBlockProps> = ({
                   />
                 </div>
               ) : (
-                <div className="h-16 flex items-center justify-center text-slate-400 italic text-[11px]">
-                  [Tanda Tangan Kasubag]
-                </div>
+                <div className="h-20" />
               )}
             </div>
 
@@ -143,7 +145,7 @@ export const TandaTanganCapBlock: React.FC<TandaTanganCapBlockProps> = ({
           {/* Kolom Kanan: Pimpinan Bawaslu + Cap Dinas */}
           <div className="flex flex-col items-center justify-end text-xs leading-snug">
             <p className="text-slate-800">
-              {kota}, {tanggal}
+              {tanggalLine}
             </p>
             <p className="font-semibold text-slate-900 mt-1 whitespace-pre-line min-h-[32px] flex items-center justify-center">
               {rightTitle || jabatanPimpinan}
@@ -204,11 +206,9 @@ export const TandaTanganCapBlock: React.FC<TandaTanganCapBlockProps> = ({
                     </div>
                   )}
                 </div>
-              ) : !hideSignature ? (
-                <div className="h-16 flex items-center justify-center text-slate-400 italic text-[11px]">
-                  {hideCap ? '[Tanda Tangan Digital]' : '[Tanda Tangan & Cap Digital]'}
-                </div>
-              ) : null}
+              ) : (
+                <div className="h-20" />
+              )}
             </div>
 
             {/* Nama & NIP Pimpinan */}
@@ -239,7 +239,7 @@ export const TandaTanganCapBlock: React.FC<TandaTanganCapBlockProps> = ({
       <div className={`flex ${alignContainerClass} ${className} print-break-inside-avoid`}>
         <div className={`text-center ${isCompact ? 'w-56 text-[11px]' : 'w-72 text-xs'} leading-snug`}>
           <p className="text-slate-800">
-            {kota}, {tanggal}
+            {tanggalLine}
           </p>
           <p className="font-semibold text-slate-900 mt-1 whitespace-pre-line">
             {kasubag.jabatan}
@@ -258,9 +258,7 @@ export const TandaTanganCapBlock: React.FC<TandaTanganCapBlockProps> = ({
                 />
               </div>
             ) : (
-              <div className="h-16 flex items-center justify-center text-slate-400 italic text-[11px]">
-                [Tanda Tangan Kasubag Administrasi]
-              </div>
+              <div className="h-20" />
             )}
           </div>
 
@@ -290,7 +288,7 @@ export const TandaTanganCapBlock: React.FC<TandaTanganCapBlockProps> = ({
       <div className={`text-center ${isCompact ? 'w-56 text-[11px]' : 'w-72 text-xs'} leading-snug`}>
         {/* Tanggal & Tempat */}
         <p className="text-slate-800">
-          {kota}, {tanggal}
+          {tanggalLine}
         </p>
 
         {/* Jabatan Pejabat */}
@@ -380,9 +378,7 @@ export const TandaTanganCapBlock: React.FC<TandaTanganCapBlockProps> = ({
               )}
             </div>
           ) : (
-            <div className="h-16 flex items-center justify-center text-slate-400 italic text-[11px]">
-              [Tanda Tangan &amp; Cap Digital]
-            </div>
+            <div className="h-20" />
           )}
         </div>
 

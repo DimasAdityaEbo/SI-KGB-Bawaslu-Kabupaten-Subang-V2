@@ -461,68 +461,122 @@ export const INITIAL_TEMPLATES: TemplateDokumen[] = [
   {
     id: 'tmpl-pengantar-provinsi',
     nama: 'Surat Pengantar Usulan KGB ke Bawaslu Provinsi Jawa Barat',
-    deskripsi: 'Surat pengantar usulan Kenaikan Gaji Berkala pegawai kepada Bawaslu Provinsi Jawa Barat.',
+    deskripsi: 'Surat dinas resmi usulan Kenaikan Gaji Berkala (KGB) Pegawai Bawaslu Kabupaten Subang kepada Bawaslu Provinsi Jawa Barat.',
     kategori: 'surat_pengantar',
-    formatNomor: '001/KP.03.01/JB-15/{BULAN_PADDED}/{TAHUN}',
-    judulDokumen: 'SURAT PENGANTAR',
+    formatNomor: '045.2/KP.04.00/JB-22/{BULAN_PADDED}/{TAHUN}',
+    judulDokumen: 'SURAT PENGANTAR USULAN KENAIKAN GAJI BERKALA',
     isiKonten: `Subang, {TANGGAL_SURAT}
 
 Nomor : {NOMOR_SURAT}
-Sifat : Biasa
-Lampiran : 1 (Satu) Bundel
-Hal : Usulan Kenaikan Gaji Berkala di Sekretariat Bawaslu Kabupaten Subang
+Sifat : Biasa / Dinas
+Lampiran : 1 (Satu) Berkas
+Hal : Usulan Kenaikan Gaji Berkala di Lingkungan Sekretariat Bawaslu Kabupaten Subang
 
 Yth. Kepala Sekretariat Bawaslu Provinsi Jawa Barat
-di
-  Bandung
+Up. Bagian Administrasi / Kepegawaian
+di -
+  BANDUNG
 
 Dengan hormat,
 
-Sehubungan dengan Kenaikan Gaji Berkala Periode {TMT_KGB_FORMAT}, bersama ini kami sampaikan usulan Kenaikan Gaji Berkala untuk Pegawai Negeri Sipil (PNS) Bawaslu Kabupaten Subang dengan data Pegawai sebagai berikut:
+Sehubungan dengan pemenuhan masa kerja dan ketentuan Kenaikan Gaji Berkala (KGB) Periode {TMT_KGB_FORMAT}, bersama ini kami sampaikan usulan Kenaikan Gaji Berkala bagi Pegawai di lingkungan Sekretariat Badan Pengawas Pemilihan Umum Kabupaten Subang dengan rincian data sebagai berikut:
 
-Nama : {NAMA_PEGAWAI}
-NIP : {NIP}
-Golongan : {PANGKAT_GOLONGAN}
+Nama Pegawai : {NAMA_PEGAWAI}
+NIP / NIK : {NIP}
+Pangkat / Golongan : {PANGKAT_GOLONGAN}
 Jabatan : {JABATAN}
+Unit Kerja : {UNIT_KERJA}
+Gaji Pokok Lama : {GAJI_POKOK_LAMA}
+Usulan Gaji Pokok Baru : {GAJI_POKOK_BARU}
+Terhitung Mulai Tanggal (TMT) : {TMT_KGB_FORMAT}
 
-Sebagai dasar pertimbangan usulan ini, kami lampirkan berkas-berkas pendukung yang dipersyaratkan antara lain sebagai berikut:
-1. Surat Keputusan Pengangkatan PNS/ PPPK
-2. Surat Keputusan Kenaikan Gaji Berkala*)
-3. Sasaran Kinerja Pegawai 2 Tahun Terakhir
+Sebagai bahan pertimbangan dan kelengkapan administrasi pemrosesan lebih lanjut di Bawaslu Provinsi Jawa Barat, bersama ini kami lampirkan berkas-berkas pendukung antara lain:
+1. Salinan Surat Keputusan Kenaikan Pangkat Terakhir;
+2. Salinan Surat Keputusan Kenaikan Gaji Berkala Terakhir;
+3. Salinan Penilaian Sasaran Kinerja Pegawai (SKP) dengan capaian minimal predikat Baik;
+4. Lembar Bukti Tanda Terima Pengajuan Berkas Digital SI-KGB.
 
-Demikian surat usulan ini disampaikan, untuk digunakan sebagaimana mestinya. Atas perhatiannya diucapkan terima kasih.`,
-
+Demikian surat pengantar usulan ini kami sampaikan untuk dapat diproses sebagaimana mestinya. Atas perhatian dan perkenan Bapak/Ibu, kami ucapkan terima kasih.`,
     penandatanganNama: 'H. TATANG KOSWARA, S.Sos., M.Si',
     penandatanganJabatan: 'Kepala Sekretariat Bawaslu Kabupaten Subang',
     penandatanganNip: '197405121998031002',
-    tembusan: [],
+    tembusan: [
+      '1. Ketua Bawaslu Kabupaten Subang (sebagai laporan)',
+      '2. Kepala Bagian Administrasi Bawaslu Provinsi Jawa Barat',
+      '3. Pegawai yang bersangkutan',
+      '4. Arsip Sub Bagian Kepegawaian & SDM'
+    ],
     isDefault: true,
     createdAt: '2026-01-01T00:00:00Z',
   },
   {
     id: 'tmpl-tanda-terima',
-    nama: 'Bukti Tanda Terima Berkas Elektronik',
-    deskripsi: 'Bukti resmi penyerahan dan penerimaan dokumen persyaratan KGB digital.',
+    nama: 'Bukti Tanda Terima Pengajuan Berkas Elektronik',
+    deskripsi: 'Bukti resmi penyerahan dan penerimaan dokumen persyaratan KGB digital melalui SI-KGB Bawaslu Kabupaten Subang.',
     kategori: 'tanda_terima',
-    formatNomor: 'TND/KGB/{BULAN}/{TAHUN}',
+    formatNomor: 'TND/KGB/{BULAN_PADDED}/{TAHUN}',
     judulDokumen: 'BUKTI TANDA TERIMA PENGAJUAN KGB ELEKTRONIK',
-    isiKonten: `Telah diterima berkas permohonan Kenaikan Gaji Berkala melalui Sistem Informasi SI-KGB Bawaslu Kabupaten Subang:
+    isiKonten: `Telah diterima dan divalidasi berkas permohonan Kenaikan Gaji Berkala (KGB) melalui Sistem Informasi SI-KGB Bawaslu Kabupaten Subang:
 
-- Nomor Registrasi : {NOMOR_SURAT}
-- Nama Pemohon     : {NAMA_PEGAWAI}
-- NIP              : {NIP}
-- Jabatan          : {JABATAN}
-- Tanggal Terima   : {TANGGAL_SURAT}
+Nomor Registrasi : {NOMOR_SURAT}
+Nama Pemohon : {NAMA_PEGAWAI}
+NIP / NIK : {NIP}
+Pangkat / Golongan : {PANGKAT_GOLONGAN}
+Jabatan : {JABATAN}
+Unit Kerja : {UNIT_KERJA}
+Tanggal Terima : {TANGGAL_SURAT}
+Terhitung Mulai Tanggal (TMT) : {TMT_KGB_FORMAT}
+Gaji Pokok Terakhir : {GAJI_POKOK_LAMA}
+Estimasi Gaji Baru : {GAJI_POKOK_BARU}
 
 Kelengkapan Berkas Terlampir:
 [✓] Salinan SK Kenaikan Pangkat Terakhir
 [✓] Salinan SK Kenaikan Gaji Berkala Terakhir
-[✓] Dokumen Penilaian Prestasi Kerja / SKP 2 Tahun Terakhir
+[✓] Dokumen Penilaian Prestasi Kerja / Sasaran Kinerja Pegawai (SKP)
 
-Tanda terima ini merupakan bukti sah bahwa berkas telah masuk dalam antrean verifikasi administrasi kepegawaian.`,
+Tanda terima digital ini merupakan bukti sah bahwa berkas pengajuan telah dicatat dalam basis data kepegawaian Sekretariat Bawaslu Kabupaten Subang dan diproses sesuai ketentuan peraturan perundang-undangan yang berlaku.`,
     penandatanganNama: 'Sub Bagian Administrasi Bawaslu Subang',
-    penandatanganJabatan: 'Petugas Pelayanan Terpadu Satu Pintu',
+    penandatanganJabatan: 'Kepala Sub Bagian Administrasi / Petugas Pelayanan Terpadu Satu Pintu',
     penandatanganNip: '198906152015031002',
+    tembusan: [
+      '1. Pemohon yang bersangkutan',
+      '2. Sub Bagian Administrasi & Kepegawaian'
+    ],
+    isDefault: true,
+    createdAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'tmpl-disposisi',
+    nama: 'Lembar Disposisi Usulan KGB Kasubag Administrasi',
+    deskripsi: 'Lembar disposisi administrasi internal verifikasi dan persetujuan usulan KGB.',
+    kategori: 'disposisi',
+    formatNomor: 'DSP/KP.04.00/{BULAN_PADDED}/{TAHUN}',
+    judulDokumen: 'LEMBAR DISPOSISI USULAN KGB',
+    isiKonten: `SUB BAGIAN ADMINISTRASI BAWASLU KABUPATEN SUBANG
+
+Nomor Agenda Disposisi : {NOMOR_SURAT}
+Tanggal Disposisi : {TANGGAL_SURAT}
+Perihal : Usulan Kenaikan Gaji Berkala (KGB)
+Nama Pegawai : {NAMA_PEGAWAI}
+NIP : {NIP}
+Pangkat / Golongan : {PANGKAT_GOLONGAN}
+Jabatan : {JABATAN}
+TMT KGB Baru : {TMT_KGB_FORMAT}
+
+CATATAN VERIFIKATOR / KASUBAG ADMINISTRASI:
+Berkas administrasi kepegawaian telah diteliti secara seksama melalui SI-KGB Bawaslu Kabupaten Subang. Persyaratan SK Pangkat Terakhir, SK KGB Terakhir, dan SKP dengan capaian kinerja minimal Baik telah terpenuhi secara lengkap.
+
+DISPOSISI / TINDAK LANJUT:
+[✓] Disetujui untuk diusulkan ke Bawaslu Provinsi Jawa Barat
+[✓] Terbitkan Surat Pengantar Resmi
+[✓] Catat dalam buku register arsip kepegawaian`,
+    penandatanganNama: 'Kepala Sub Bagian Administrasi',
+    penandatanganJabatan: 'Kasubag Administrasi Bawaslu Kabupaten Subang',
+    penandatanganNip: '198906152015031002',
+    tembusan: [
+      '1. Kepala Sekretariat Bawaslu Kabupaten Subang',
+      '2. Arsip Kepegawaian'
+    ],
     isDefault: true,
     createdAt: '2026-01-01T00:00:00Z',
   }

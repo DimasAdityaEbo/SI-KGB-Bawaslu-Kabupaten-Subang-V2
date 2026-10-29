@@ -20,6 +20,7 @@ import {
   Check,
   Calendar,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import { PengajuanKGB, Pegawai, PengajuanStatus, DokumenLampiran, EmailDispatchLog } from '../../types';
 import { savePengajuan, savePegawai, deletePengajuan } from '../../services/storage';
@@ -31,7 +32,7 @@ import {
 } from '../../services/emailService';
 import { PrintDocumentModal } from '../PrintDocumentModal';
 import { DocumentViewerModal } from '../DocumentViewerModal';
-import { downloadDokumenFile } from '../../services/documentUtils';
+import { downloadDokumenFile, readFileAsDataUrl } from '../../services/documentUtils';
 
 interface DaftarPengajuanProps {
   pengajuanList: PengajuanKGB[];
@@ -62,6 +63,8 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
   const [newStatus, setNewStatus] = useState<PengajuanStatus>('disetujui');
   const [catatanVerifikasi, setCatatanVerifikasi] = useState('');
   const [nomorSk, setNomorSk] = useState('');
+  const [fileSkDiterbitkan, setFileSkDiterbitkan] = useState<File | null>(null);
+  const [existingSkDoc, setExistingSkDoc] = useState<DokumenLampiran | undefined>(undefined);
   const [isUpdating, setIsUpdating] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
@@ -79,7 +82,7 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
 
   // Print modal state
   const [printModalOpen, setPrintModalOpen] = useState(false);
-  const [printMode, setPrintMode] = useState<'surat_pengantar' | 'tanda_terima'>('surat_pengantar');
+  const [printMode, setPrintMode] = useState<'surat_pengantar' | 'tanda_terima' | 'sk_kgb' | 'disposisi'>('surat_pengantar');
 
   // Delete pengajuan state
   const [deleteTarget, setDeleteTarget] = useState<PengajuanKGB | null>(null);
@@ -111,10 +114,14 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
       item.nomorSkKgbDiterbitkan ||
         `045.2/KP.04.00/JB-22/${new Date().getMonth() + 1}/${new Date().getFullYear()}`
     );
+    setFileSkDiterbitkan(null);
+    setExistingSkDoc(item.dokumenSkKgbDiterbitkan);
   };
 
   const handleCloseDetail = () => {
     setActivePengajuan(null);
+    setFileSkDiterbitkan(null);
+    setExistingSkDoc(undefined);
     if (onClearSelectedPengajuan) onClearSelectedPengajuan();
   };
 
@@ -128,17 +135,37 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
 
     setIsUpdating(true);
     try {
+      // Process uploaded SK document if approved
+      let skKgbDoc: DokumenLampiran | undefined = existingSkDoc;
+      if (newStatus === 'disetujui') {
+        if (fileSkDiterbitkan) {
+          const fileData = await readFileAsDataUrl(fileSkDiterbitkan);
+          skKgbDoc = {
+            id: `sk-kgb-resmi-${Date.now()}`,
+            namaFile: fileSkDiterbitkan.name,
+            jenisDokumen: 'sk_kgb',
+            tipeFile: fileSkDiterbitkan.type || 'application/pdf',
+            ukuranFile: `${(fileSkDiterbitkan.size / (1024 * 1024)).toFixed(2)} MB`,
+            fileData,
+            uploadedAt: new Date().toISOString(),
+          };
+        }
+      } else {
+        skKgbDoc = undefined;
+      }
+
       const updated: PengajuanKGB = {
         ...activePengajuan,
         status: newStatus,
         catatanVerifikator: catatanVerifikasi.trim() || undefined,
-        diverifikasiOleh: 'Administrator Kepegawaian Bawaslu Subang',
+        diverifikasiOleh: 'Kepala Sub Bagian Administrasi Bawaslu Subang',
         tanggalVerifikasi: new Date().toISOString(),
         nomorSkKgbDiterbitkan: newStatus === 'disetujui' ? nomorSk : undefined,
         tanggalSkDiterbitkan:
           newStatus === 'disetujui'
-            ? new Date().toISOString().split('T')[0]
+            ? activePengajuan.tanggalSkDiterbitkan || new Date().toISOString().split('T')[0]
             : undefined,
+        dokumenSkKgbDiterbitkan: newStatus === 'disetujui' ? skKgbDoc : undefined,
       };
 
       // 1. Save data pengajuan safely
@@ -489,7 +516,7 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
                 <h4 className="font-bold text-slate-900 text-sm">
                   Kelengkapan Berkas & Dokumen Terlampir
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className={`grid grid-cols-1 ${activePengajuan.dokumenSkKgbDiterbitkan ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-3'} gap-3`}>
                   {/* SK Pangkat */}
                   <div className="rounded-lg border border-slate-200 bg-white p-3.5 flex flex-col justify-between">
                     <div>
@@ -613,6 +640,52 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
                       </div>
                     )}
                   </div>
+
+                  {/* SK KGB Resmi Diterbitkan (jika sudah ada) */}
+                  {activePengajuan.dokumenSkKgbDiterbitkan && (
+                    <div className="rounded-lg border-2 border-emerald-300 bg-emerald-50/70 p-3.5 flex flex-col justify-between shadow-2xs">
+                      <div>
+                        <div className="flex items-center gap-1.5 text-emerald-800 font-bold mb-1">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          <span>SK KGB Diterbitkan</span>
+                        </div>
+                        <p className="text-[11px] text-slate-800 font-medium truncate" title={activePengajuan.dokumenSkKgbDiterbitkan.namaFile}>
+                          {activePengajuan.dokumenSkKgbDiterbitkan.namaFile}
+                        </p>
+                        <p className="text-[10px] text-emerald-700 font-medium">
+                          {activePengajuan.dokumenSkKgbDiterbitkan.ukuranFile} • Resmi Diterbitkan
+                        </p>
+                      </div>
+                      <div className="mt-3 flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (activePengajuan.dokumenSkKgbDiterbitkan) {
+                              setViewingDoc(activePengajuan.dokumenSkKgbDiterbitkan);
+                              setIsDocViewerOpen(true);
+                            }
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1 rounded bg-emerald-700 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-800 transition"
+                        >
+                          <Eye className="h-3 w-3" />
+                          <span>Lihat</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (activePengajuan.dokumenSkKgbDiterbitkan) {
+                              downloadDokumenFile(activePengajuan.dokumenSkKgbDiterbitkan, activePengajuan);
+                            }
+                          }}
+                          className="flex items-center justify-center gap-1 rounded border border-emerald-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-50 transition"
+                          title="Unduh SK KGB Resmi"
+                        >
+                          <Download className="h-3 w-3" />
+                          <span>Unduh</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -713,19 +786,141 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
                   </div>
                 )}
 
-                {/* If approved, show Nomot SK field */}
+                {/* If approved, show Nomor SK field & SK Document Upload */}
                 {newStatus === 'disetujui' && (
-                  <div>
-                    <label className="block font-semibold text-slate-800 mb-1">
-                      Nomor Surat Rekomendasi / SK KGB Diterbitkan:
-                    </label>
-                    <input
-                      type="text"
-                      value={nomorSk}
-                      onChange={(e) => setNomorSk(e.target.value)}
-                      placeholder="045.2/KP.04.00/JB-22/10/2026"
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
-                    />
+                  <div className="space-y-4 rounded-xl border border-emerald-300 bg-emerald-50/60 p-4">
+                    <div>
+                      <label className="block font-semibold text-emerald-950 mb-1">
+                        Nomor Surat Rekomendasi / SK KGB Diterbitkan:
+                      </label>
+                      <input
+                        type="text"
+                        value={nomorSk}
+                        onChange={(e) => setNomorSk(e.target.value)}
+                        placeholder="045.2/KP.04.00/JB-22/10/2026"
+                        className="w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 focus:border-emerald-600 focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Upload Dokumen SK KGB Resmi */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block font-semibold text-emerald-950">
+                          Upload Dokumen SK KGB (Resmi):
+                        </label>
+                        <span className="text-[11px] text-emerald-700">Format: PDF, JPG, PNG (Maks. 10MB)</span>
+                      </div>
+
+                      {/* Kasus 1: Ada berkas baru yang baru dipilih */}
+                      {fileSkDiterbitkan ? (
+                        <div className="flex items-center justify-between rounded-lg border border-emerald-400 bg-white p-3 shadow-2xs">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="h-9 w-9 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
+                              <FileCheck className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-emerald-950 truncate">
+                                {fileSkDiterbitkan.name}
+                              </p>
+                              <p className="text-[11px] text-emerald-700">
+                                {(fileSkDiterbitkan.size / (1024 * 1024)).toFixed(2)} MB • Berkas baru siap diunggah &amp; diterbitkan
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setFileSkDiterbitkan(null)}
+                            className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-100 transition shrink-0 ml-2"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      ) : existingSkDoc ? (
+                        /* Kasus 2: Sudah ada dokumen SK sebelumnya */
+                        <div className="rounded-lg border border-emerald-300 bg-white p-3 shadow-2xs space-y-2">
+                          <div className="flex items-center justify-between min-w-0">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="h-9 w-9 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
+                                <CheckCircle2 className="h-5 w-5" />
+                              </div>
+                              <div className="min-w-0">
+                                <span className="inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 mb-0.5">
+                                  Dokumen SK Resmi Tersedia
+                                </span>
+                                <p className="text-xs font-semibold text-slate-900 truncate">
+                                  {existingSkDoc.namaFile}
+                                </p>
+                                <p className="text-[11px] text-slate-500">
+                                  {existingSkDoc.ukuranFile}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setViewingDoc(existingSkDoc);
+                                  setIsDocViewerOpen(true);
+                                }}
+                                className="flex items-center gap-1 rounded bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-800 transition"
+                              >
+                                <Eye className="h-3 w-3" />
+                                <span>Lihat</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => downloadDokumenFile(existingSkDoc, activePengajuan)}
+                                className="flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition"
+                              >
+                                <Download className="h-3 w-3" />
+                                <span>Unduh</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-slate-100 pt-2 flex items-center justify-between">
+                            <span className="text-[11px] text-slate-500">Ingin mengganti berkas SK ini?</span>
+                            <label className="cursor-pointer text-[11px] font-bold text-emerald-700 hover:text-emerald-800 underline">
+                              <span>Pilih Berkas Baru</span>
+                              <input
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    setFileSkDiterbitkan(e.target.files[0]);
+                                  }
+                                }}
+                                className="sr-only"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Kasus 3: Belum ada file, tampilkan area upload */
+                        <label className="group flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-emerald-300 bg-white p-4 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/40 transition">
+                          <Upload className="h-6 w-6 text-emerald-600 mb-1 group-hover:scale-110 transition-transform" />
+                          <p className="text-xs font-bold text-emerald-950">
+                            Pilih atau Tarik Berkas SK KGB ke Sini
+                          </p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Format PDF, JPG, atau PNG (Maksimal 10MB)
+                          </p>
+                          <p className="text-[10px] text-emerald-700 font-medium mt-1">
+                            Dokumen yang diunggah akan langsung tersedia bagi pegawai di portal SI-KGB
+                          </p>
+                          <input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                setFileSkDiterbitkan(e.target.files[0]);
+                              }
+                            }}
+                            className="sr-only"
+                          />
+                        </label>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -771,23 +966,53 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
                   <span>Hapus Pengajuan</span>
                 </button>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-slate-700 mr-1">Cetak Dokumen:</span>
                   <button
-                    onClick={() => handleOpenPrint('tanda_terima')}
-                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+                    onClick={() => {
+                      setPrintMode('tanda_terima');
+                      setPrintModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
                     title="Cetak Bukti Tanda Terima Pengajuan Berkas"
                   >
                     <Printer className="h-3.5 w-3.5 text-sky-600" />
                     <span>Tanda Terima</span>
                   </button>
                   <button
-                    onClick={() => handleOpenPrint('surat_pengantar')}
-                    className="flex items-center gap-1.5 rounded-lg bg-indigo-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-800 transition shadow-xs"
+                    onClick={() => {
+                      setPrintMode('surat_pengantar');
+                      setPrintModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-800 transition shadow-xs"
                     title="Cetak Surat Pengantar Usulan KGB ke Bawaslu Provinsi"
                   >
                     <Printer className="h-3.5 w-3.5" />
                     <span>Surat Pengantar</span>
+                  </button>
+                  {activePengajuan.status === 'disetujui' && (
+                    <button
+                      onClick={() => {
+                        setPrintMode('sk_kgb');
+                        setPrintModalOpen(true);
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs"
+                      title="Cetak Surat Pemberitahuan / SK KGB Resmi"
+                    >
+                      <Printer className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>SK / Pemberitahuan KGB</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setPrintMode('disposisi');
+                      setPrintModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+                    title="Cetak Lembar Disposisi Kasubag Administrasi"
+                  >
+                    <Printer className="h-3.5 w-3.5 text-amber-600" />
+                    <span>Disposisi</span>
                   </button>
                 </div>
               </div>

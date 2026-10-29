@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Download, Printer, FileText, CheckCircle2, ShieldCheck, Eye, ExternalLink } from 'lucide-react';
 import { DokumenLampiran, PengajuanKGB } from '../types';
 import { getOrGenerateDocumentUrl, downloadDokumenFile } from '../services/documentUtils';
+import { getDocumentBinary } from '../services/idbStorage';
 import { BawasluLogo } from './BawasluLogo';
 
 interface DocumentViewerModalProps {
@@ -17,9 +18,33 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
   document,
   pengajuan,
 }) => {
+  const [asyncDataUrl, setAsyncDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!document) {
+      setAsyncDataUrl(null);
+      return;
+    }
+    if (document.fileData && document.fileData.startsWith('data:')) {
+      setAsyncDataUrl(document.fileData);
+      return;
+    }
+    getDocumentBinary(document.id)
+      .then((bin) => {
+        if (bin) {
+          setAsyncDataUrl(bin);
+        } else {
+          setAsyncDataUrl(getOrGenerateDocumentUrl(document, pengajuan));
+        }
+      })
+      .catch(() => {
+        setAsyncDataUrl(getOrGenerateDocumentUrl(document, pengajuan));
+      });
+  }, [document, pengajuan]);
+
   if (!isOpen || !document) return null;
 
-  const dataUrl = getOrGenerateDocumentUrl(document, pengajuan);
+  const dataUrl = asyncDataUrl || getOrGenerateDocumentUrl(document, pengajuan);
   const isImage =
     document.tipeFile?.startsWith('image/') ||
     document.namaFile.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i) ||

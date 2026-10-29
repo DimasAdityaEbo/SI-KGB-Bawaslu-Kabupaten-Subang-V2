@@ -1,4 +1,5 @@
 import { DokumenLampiran, PengajuanKGB } from '../types';
+import { getDocumentBinary } from './idbStorage';
 
 /**
  * Reads a File object from input and converts to base64 Data URL
@@ -71,7 +72,7 @@ export const getOrGenerateDocumentUrl = (
 
         <text x="90" y="28" font-family="sans-serif" font-size="14" font-weight="bold" fill="#334155" letter-spacing="1">BADAN PENGAWAS PEMILIHAN UMUM</text>
         <text x="90" y="52" font-family="sans-serif" font-size="20" font-weight="900" fill="#0f172a" letter-spacing="2">KABUPATEN SUBANG</text>
-        <text x="90" y="72" font-family="sans-serif" font-size="10" fill="#64748b">Jl. Veteran No. 12, Kel. Dangdeur, Kec. Subang, Jawa Barat 41211</text>
+        <text x="90" y="72" font-family="sans-serif" font-size="10" fill="#64748b">Jl. Palabuan No. 9, Kel. Sukamelang, Kec. Subang, Jawa Barat 41211</text>
       </g>
 
       <line x1="60" y1="155" x2="740" y2="155" stroke="#0f172a" stroke-width="3"/>
@@ -161,11 +162,20 @@ export const getOrGenerateDocumentUrl = (
 /**
  * Triggers a direct file download in the browser
  */
-export const downloadDokumenFile = (
+export const downloadDokumenFile = async (
   doc: DokumenLampiran,
   pengajuan?: PengajuanKGB
-): void => {
-  const dataUrl = getOrGenerateDocumentUrl(doc, pengajuan);
+): Promise<void> => {
+  let dataUrl = doc.fileData;
+  if (!dataUrl || !dataUrl.startsWith('data:')) {
+    try {
+      const bin = await getDocumentBinary(doc.id);
+      if (bin) dataUrl = bin;
+    } catch (e) {}
+  }
+  if (!dataUrl) {
+    dataUrl = getOrGenerateDocumentUrl(doc, pengajuan);
+  }
 
   // If it's a data URL, we can download directly
   const link = document.createElement('a');

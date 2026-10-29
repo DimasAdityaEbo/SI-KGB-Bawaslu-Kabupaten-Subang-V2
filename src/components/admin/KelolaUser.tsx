@@ -10,6 +10,8 @@ import {
   X,
   Check,
   Search,
+  AlertTriangle,
+  Copy,
 } from 'lucide-react';
 import { User, Pegawai, UserRole } from '../../types';
 import { saveUser, deleteUser } from '../../services/storage';
@@ -29,21 +31,30 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [sqlFix, setSqlFix] = useState<string | null>(null);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   // Form State
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('pegawai');
+  const [namaLengkap, setNamaLengkap] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<UserRole>('kasubag');
   const [selectedPegawaiId, setSelectedPegawaiId] = useState('');
   const [status, setStatus] = useState<'aktif' | 'nonaktif'>('aktif');
 
   const handleOpenAdd = () => {
     setSelectedUser(null);
-    setUsername('');
+    setUsername('kasubag');
     setPassword('password123');
-    setRole('pegawai');
-    setSelectedPegawaiId(pegawaiList[0]?.id || '');
+    setRole('kasubag');
+    setNamaLengkap('Kepala Sub Bagian Administrasi Bawaslu Subang');
+    setEmail('kasubag@bawaslu-subang.go.id');
+    setSelectedPegawaiId('');
     setStatus('aktif');
+    setFormError(null);
+    setSqlFix(null);
     setIsModalOpen(true);
   };
 
@@ -51,10 +62,52 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
     setSelectedUser(user);
     setUsername(user.username);
     setPassword(user.password || '');
+    setNamaLengkap(user.namaLengkap);
+    setEmail(user.email);
     setRole(user.role);
     setSelectedPegawaiId(user.pegawaiId || '');
     setStatus(user.status);
+    setFormError(null);
+    setSqlFix(null);
     setIsModalOpen(true);
+  };
+
+  const handleRoleChange = (newRole: UserRole) => {
+    setRole(newRole);
+    setFormError(null);
+    if (!selectedUser) {
+      if (newRole === 'kasubag') {
+        if (!username || username === 'admin') setUsername('kasubag');
+        if (!namaLengkap || namaLengkap.includes('Administrator')) setNamaLengkap('Kepala Sub Bagian Administrasi Bawaslu Subang');
+        if (!email || email.includes('admin@')) setEmail('kasubag@bawaslu-subang.go.id');
+      } else if (newRole === 'admin') {
+        if (!username || username === 'kasubag') setUsername('admin');
+        if (!namaLengkap || namaLengkap.includes('Kasubag')) setNamaLengkap('Administrator Sistem Bawaslu Subang');
+        if (!email || email.includes('kasubag@')) setEmail('admin@bawaslu-subang.go.id');
+      } else if (newRole === 'pegawai') {
+        const firstPeg = pegawaiList[0];
+        if (firstPeg) {
+          setSelectedPegawaiId(firstPeg.id);
+          setNamaLengkap(firstPeg.nama);
+          setEmail(firstPeg.email);
+          const nick = firstPeg.nama.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+          setUsername(nick);
+        }
+      }
+    }
+  };
+
+  const handlePegawaiChange = (pegawaiId: string) => {
+    setSelectedPegawaiId(pegawaiId);
+    const chosen = pegawaiList.find((p) => p.id === pegawaiId);
+    if (chosen) {
+      setNamaLengkap(chosen.nama);
+      setEmail(chosen.email);
+      if (role === 'pegawai' && (!selectedUser || !username)) {
+        const nick = chosen.nama.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+        setUsername(nick);
+      }
+    }
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -66,28 +119,41 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+    setSqlFix(null);
+
+    const cleanUsername = username.trim().toLowerCase();
+    if (!cleanUsername) {
+      setFormError('Username tidak boleh kosong!');
+      return;
+    }
+
+    if (!namaLengkap.trim()) {
+      setFormError('Nama lengkap pengguna wajib diisi!');
+      return;
+    }
+
+    // Check duplicate username
+    const duplicate = usersList.find(
+      (u) => u.username.toLowerCase() === cleanUsername && u.id !== selectedUser?.id
+    );
+    if (duplicate) {
+      setFormError(
+        `Username "${cleanUsername}" sudah digunakan oleh akun "${duplicate.namaLengkap}". Silakan gunakan username lain.`
+      );
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const linkedPegawai = pegawaiList.find((p) => p.id === selectedPegawaiId);
-
       const userPayload: User = {
         id: selectedUser?.id || `usr-${Date.now()}`,
-        username: username.trim().toLowerCase(),
+        username: cleanUsername,
         password: password.trim(),
         role,
-        pegawaiId: role === 'pegawai' ? selectedPegawaiId : undefined,
-        namaLengkap:
-          role === 'admin'
-            ? (selectedUser?.namaLengkap || 'Administrator Sistem Bawaslu Subang')
-            : role === 'kasubag'
-            ? (selectedUser?.namaLengkap || 'Kepala Sub Bagian Administrasi Bawaslu Subang')
-            : linkedPegawai?.nama || username,
-        email:
-          role === 'admin'
-            ? (selectedUser?.email || 'admin@bawaslu-subang.go.id')
-            : role === 'kasubag'
-            ? (selectedUser?.email || 'kasubag@bawaslu-subang.go.id')
-            : linkedPegawai?.email || `${username}@bawaslu-subang.go.id`,
+        pegawaiId: selectedPegawaiId || undefined,
+        namaLengkap: namaLengkap.trim(),
+        email: email.trim() || `${cleanUsername}@bawaslu-subang.go.id`,
         status,
         createdAt: selectedUser?.createdAt || new Date().toISOString(),
         lastLogin: selectedUser?.lastLogin,
@@ -96,8 +162,24 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
       await saveUser(userPayload);
       setIsModalOpen(false);
       onRefreshData();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.warn('KelolaUser submit caught error:', err);
+      if (
+        err.message?.includes('KASUBAG_CHECK_CONSTRAINT') ||
+        err.message?.includes('users_role_check') ||
+        err.message?.includes('violates check constraint')
+      ) {
+        setFormError(
+          `Akun berhasil dibuat dan disimpan secara lokal (dapat langsung digunakan untuk login). Namun database cloud Supabase Anda menolak role 'kasubag' karena tabel masih memakai constraint lama. Jalankan migrasi berikut di Supabase SQL Editor:`
+        );
+        setSqlFix(
+          `ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_role_check;\nALTER TABLE public.users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'pegawai', 'kasubag'));`
+        );
+        // Refresh anyway so local user appears in table
+        onRefreshData();
+      } else {
+        setFormError(err.message || 'Gagal menyimpan pengguna. Silakan coba kembali.');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -241,6 +323,49 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
               </button>
             </div>
 
+            {formError && (
+              <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900 leading-relaxed space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="font-medium">{formError}</div>
+                </div>
+
+                {sqlFix && (
+                  <div className="mt-2 rounded border border-amber-300/80 bg-white p-2.5 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] font-bold text-slate-700">
+                        Query SQL untuk Supabase SQL Editor:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(sqlFix);
+                          setCopiedSql(true);
+                          setTimeout(() => setCopiedSql(false), 2500);
+                        }}
+                        className="inline-flex items-center gap-1 rounded bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white hover:bg-slate-800 transition"
+                      >
+                        {copiedSql ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-400" />
+                            <span>Tersalin!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>Salin SQL</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <pre className="font-mono text-[10px] text-slate-800 overflow-x-auto p-1.5 bg-slate-50 rounded border border-slate-200 select-all">
+                      {sqlFix}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-800 mb-1">
@@ -248,26 +373,34 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
                 </label>
                 <select
                   value={role}
-                  onChange={(e) => setRole(e.target.value as UserRole)}
+                  onChange={(e) => handleRoleChange(e.target.value as UserRole)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
                 >
-                  <option value="pegawai">Pegawai Bawaslu</option>
-                  <option value="kasubag">Kasubag (Kepala Sub Bagian)</option>
+                  <option value="kasubag">Kasubag (Kepala Sub Bagian Administrasi)</option>
+                  <option value="pegawai">Pegawai ASN / Non-ASN</option>
                   <option value="admin">Administrator Sistem</option>
                 </select>
               </div>
 
-              {role === 'pegawai' && (
+              {/* Tautkan Pegawai: Wajib untuk Pegawai, Opsional untuk Kasubag */}
+              {(role === 'pegawai' || role === 'kasubag') && (
                 <div>
                   <label className="block font-semibold text-slate-800 mb-1">
-                    Tautkan ke Data Pegawai Bawaslu *
+                    {role === 'pegawai'
+                      ? 'Tautkan ke Data Pegawai Bawaslu *'
+                      : 'Tautkan ke Data Pegawai Bawaslu (Opsional)'}
                   </label>
                   <select
                     value={selectedPegawaiId}
-                    onChange={(e) => setSelectedPegawaiId(e.target.value)}
-                    required
+                    onChange={(e) => handlePegawaiChange(e.target.value)}
+                    required={role === 'pegawai'}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
                   >
+                    <option value="">
+                      {role === 'pegawai'
+                        ? '-- Pilih Pegawai Terkait --'
+                        : '-- Tanpa Tautan (Gunakan Nama & Email Manual) --'}
+                    </option>
                     {pegawaiList.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.nama} (NIP: {p.nip})
@@ -275,10 +408,40 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
                     ))}
                   </select>
                   <p className="mt-1 text-[11px] text-slate-500">
-                    Pengguna ini akan secara otomatis mengisi formulir KGB berdasarkan data pegawai ini.
+                    {role === 'pegawai'
+                      ? 'Pengguna ini akan secara otomatis mengisi formulir KGB berdasarkan data pegawai ini.'
+                      : 'Opsional: Jika Kasubag juga terdaftar pada database pegawai, nama dan email akan terisi otomatis.'}
                   </p>
                 </div>
               )}
+
+              <div>
+                <label className="block font-semibold text-slate-800 mb-1">
+                  Nama Lengkap Pengguna *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={namaLengkap}
+                  onChange={(e) => setNamaLengkap(e.target.value)}
+                  placeholder="Contoh: Drs. H. Tatang Koswara / Kepala Sub Bagian Administrasi"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-800 mb-1">
+                  Email Pengguna *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Contoh: kasubag@bawaslu-subang.go.id"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
+                />
+              </div>
 
               <div>
                 <label className="block font-semibold text-slate-800 mb-1">
@@ -289,7 +452,7 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Contoh: dimas / ahmad"
+                  placeholder="Contoh: kasubag / kasubag_admin"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
                 />
               </div>
@@ -305,12 +468,12 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Masukkan password baru..."
+                    placeholder="Masukkan password..."
                     className="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-2 font-mono text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
                   />
                 </div>
                 <p className="mt-1 text-[11px] text-slate-500">
-                  Password dapat langsung dibagikan kepada pegawai yang bersangkutan.
+                  Password ini akan digunakan saat login ke dalam sistem.
                 </p>
               </div>
 
@@ -334,7 +497,7 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
                   onClick={() => setIsModalOpen(false)}
                   className="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  Batal
+                  Tutup
                 </button>
                 <button
                   type="submit"

@@ -267,7 +267,13 @@ export const LaporanKgb: React.FC<LaporanKgbProps> = ({ pengajuanList, pegawaiLi
 
         {/* Signature Block (Printable) */}
         <div className="mt-12 flex justify-end print-break-inside-avoid">
-          <TandaTanganCapBlock config={ttdCapConfig} align="right" mode="pimpinan_saja" />
+          <TandaTanganCapBlock
+            config={ttdCapConfig}
+            align="right"
+            mode="pimpinan_saja"
+            hideCap={true}
+            hideSignature={true}
+          />
         </div>
       </div>
 
