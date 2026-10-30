@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   ShieldCheck,
-  UserPlus,
   KeyRound,
   Trash2,
   Edit2,
@@ -44,20 +43,6 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
   const [selectedPegawaiId, setSelectedPegawaiId] = useState('');
   const [status, setStatus] = useState<'aktif' | 'nonaktif'>('aktif');
 
-  const handleOpenAdd = () => {
-    setSelectedUser(null);
-    setUsername('kasubag');
-    setPassword('password123');
-    setRole('kasubag');
-    setNamaLengkap('Kepala Sub Bagian Administrasi Bawaslu Subang');
-    setEmail('kasubag@bawaslu-subang.go.id');
-    setSelectedPegawaiId('');
-    setStatus('aktif');
-    setFormError(null);
-    setSqlFix(null);
-    setIsModalOpen(true);
-  };
-
   const handleOpenEdit = (user: User) => {
     setSelectedUser(user);
     setUsername(user.username);
@@ -75,26 +60,6 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
   const handleRoleChange = (newRole: UserRole) => {
     setRole(newRole);
     setFormError(null);
-    if (!selectedUser) {
-      if (newRole === 'kasubag') {
-        if (!username || username === 'admin') setUsername('kasubag');
-        if (!namaLengkap || namaLengkap.includes('Administrator')) setNamaLengkap('Kepala Sub Bagian Administrasi Bawaslu Subang');
-        if (!email || email.includes('admin@')) setEmail('kasubag@bawaslu-subang.go.id');
-      } else if (newRole === 'admin') {
-        if (!username || username === 'kasubag') setUsername('admin');
-        if (!namaLengkap || namaLengkap.includes('Kasubag')) setNamaLengkap('Administrator Sistem Bawaslu Subang');
-        if (!email || email.includes('kasubag@')) setEmail('admin@bawaslu-subang.go.id');
-      } else if (newRole === 'pegawai') {
-        const firstPeg = pegawaiList[0];
-        if (firstPeg) {
-          setSelectedPegawaiId(firstPeg.id);
-          setNamaLengkap(firstPeg.nama);
-          setEmail(firstPeg.email);
-          const nick = firstPeg.nama.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-          setUsername(nick);
-        }
-      }
-    }
   };
 
   const handlePegawaiChange = (pegawaiId: string) => {
@@ -103,10 +68,6 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
     if (chosen) {
       setNamaLengkap(chosen.nama);
       setEmail(chosen.email);
-      if (role === 'pegawai' && (!selectedUser || !username)) {
-        const nick = chosen.nama.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-        setUsername(nick);
-      }
     }
   };
 
@@ -144,10 +105,12 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
       return;
     }
 
+    if (!selectedUser) return;
+
     setIsSaving(true);
     try {
       const userPayload: User = {
-        id: selectedUser?.id || `usr-${Date.now()}`,
+        id: selectedUser.id,
         username: cleanUsername,
         password: password.trim(),
         role,
@@ -155,12 +118,13 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
         namaLengkap: namaLengkap.trim(),
         email: email.trim() || `${cleanUsername}@bawaslu-subang.go.id`,
         status,
-        createdAt: selectedUser?.createdAt || new Date().toISOString(),
-        lastLogin: selectedUser?.lastLogin,
+        createdAt: selectedUser.createdAt || new Date().toISOString(),
+        lastLogin: selectedUser.lastLogin,
       };
 
       await saveUser(userPayload);
       setIsModalOpen(false);
+      setSelectedUser(null);
       onRefreshData();
     } catch (err: any) {
       console.warn('KelolaUser submit caught error:', err);
@@ -170,7 +134,7 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
         err.message?.includes('violates check constraint')
       ) {
         setFormError(
-          `Akun berhasil dibuat dan disimpan secara lokal (dapat langsung digunakan untuk login). Namun database cloud Supabase Anda menolak role 'kasubag' karena tabel masih memakai constraint lama. Jalankan migrasi berikut di Supabase SQL Editor:`
+          `Akun berhasil diperbarui dan disimpan secara lokal. Namun database cloud Supabase Anda menolak role 'kasubag' karena tabel masih memakai constraint lama. Jalankan migrasi berikut di Supabase SQL Editor:`
         );
         setSqlFix(
           `ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_role_check;\nALTER TABLE public.users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'pegawai', 'kasubag'));`
@@ -201,16 +165,9 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
             Kelola Akun Pengguna &amp; Akses Sistem
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Manajemen kredensial login (username &amp; password), hak akses peranan (Role Admin / Pegawai), serta penautan profil.
+            Manajemen kredensial login (username &amp; password), hak akses peranan (Role Admin, Kasubag, atau Pegawai), serta status akun.
           </p>
         </div>
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 shadow-xs"
-        >
-          <UserPlus className="h-4 w-4" />
-          <span>Tambah Akun Pengguna</span>
-        </button>
       </div>
 
       {/* Search Bar */}
@@ -307,16 +264,19 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
         </div>
       </div>
 
-      {/* ADD/EDIT USER MODAL */}
-      {isModalOpen && (
+      {/* EDIT USER MODAL */}
+      {isModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
           <div className="max-h-[90vh] w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-base font-bold text-slate-900">
-                {selectedUser ? 'Edit Username & Password' : 'Buat Akun Pengguna Baru'}
+                Edit Kredensial Akun ({selectedUser.username})
               </h3>
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setSelectedUser(null);
+                }}
                 className="text-slate-400 hover:text-slate-600"
               >
                 <X className="h-5 w-5" />
@@ -494,7 +454,10 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
               <div className="flex items-center justify-end gap-2 border-t pt-4">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setSelectedUser(null);
+                  }}
                   className="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Tutup
