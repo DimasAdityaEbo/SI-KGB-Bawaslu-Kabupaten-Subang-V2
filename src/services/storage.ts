@@ -767,7 +767,7 @@ export async function addEmailLog(log: EmailDispatchLog): Promise<void> {
 }
 
 // ======================== TEMPLATES REPOSITORY ========================
-export async function getTemplatesList(): Promise<TemplateDokumen[]> {
+function getLocalTemplatesList(): TemplateDokumen[] {
   try {
     const raw = localStorage.getItem(KEYS.TEMPLATES);
     if (!raw) {
@@ -804,35 +804,197 @@ export async function getTemplatesList(): Promise<TemplateDokumen[]> {
   }
 }
 
+function mapSupabaseTemplate(row: Record<string, unknown>): TemplateDokumen {
+  const metadata =
+    row.variabel_tersedia &&
+    typeof row.variabel_tersedia === 'object' &&
+    !Array.isArray(row.variabel_tersedia)
+      ? (row.variabel_tersedia as Record<string, unknown>)
+      : {};
+  const categories: TemplateDokumen['kategori'][] = [
+    'surat_pengantar',
+    'sk_kgb',
+    'disposisi',
+    'tanda_terima',
+    'surat_keterangan',
+    'lainnya',
+  ];
+  const category = categories.find((item) => item === row.kategori) || 'lainnya';
+  const text = (value: unknown) => (typeof value === 'string' ? value : '');
+
+  return {
+    id: text(row.id),
+    nama: text(metadata.nama) || text(row.judul),
+    deskripsi: text(row.deskripsi),
+    kategori: category,
+    formatNomor: text(row.nomor_perbawaslu),
+    judulDokumen: text(row.judul),
+    isiKonten: text(row.isi_template),
+    penandatanganNama: text(metadata.penandatanganNama),
+    penandatanganJabatan: text(metadata.penandatanganJabatan),
+    penandatanganNip: text(metadata.penandatanganNip),
+    tembusan: Array.isArray(metadata.tembusan)
+      ? metadata.tembusan.filter((item): item is string => typeof item === 'string')
+      : [],
+    isDefault: row.is_default === true,
+    createdAt: text(row.created_at) || new Date().toISOString(),
+    updatedAt: text(row.terakhir_diubah) || undefined,
+  };
+}
+
+function mapTemplateToSupabase(template: TemplateDokumen): Record<string, unknown> {
+  return {
+    id: template.id,
+    judul: template.judulDokumen || template.nama,
+    nomor_perbawaslu: template.formatNomor,
+    kategori: template.kategori,
+    deskripsi: template.deskripsi,
+    isi_template: template.isiKonten,
+    variabel_tersedia: {
+      nama: template.nama,
+      penandatanganNama: template.penandatanganNama,
+      penandatanganJabatan: template.penandatanganJabatan,
+      penandatanganNip: template.penandatanganNip,
+      tembusan: template.tembusan || [],
+    },
+    terakhir_diubah: template.updatedAt || template.createdAt,
+    diubah_oleh: getCurrentSessionUser()?.namaLengkap || null,
+    is_default: Boolean(template.isDefault),
+    created_at: template.createdAt,
+  };
+}
+
+function cacheTemplates(templates: TemplateDokumen[]): void {
+  safeLocalStorageSet(KEYS.TEMPLATES, templates);
+}
+
+export async function getTemplatesList(): Promise<TemplateDokumen[]> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return getLocalTemplatesList();
+
+  const { data, error } = await supabase
+    .from('template_dokumen')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) {
+    console.error('Supabase fetch templates error:', error);
+    throw new Error(`Gagal memuat template dari Supabase: ${error.message}`);
+  }
+
+  let templates = (data || [])
+    .map((row) => mapSupabaseTemplate(row))
+    .filter((template) => template.id !== 'tmpl-sk-kgb' && template.kategori !== 'sk_kgb');
+
+  if (templates.length === 0) {
+    templates = getLocalTemplatesList();
+    const { error: seedError } = await supabase
+      .from('template_dokumen')
+      .upsert(templates.map(mapTemplateToSupabase));
+    if (seedError) {
+      console.error('Supabase seed templates error:', seedError);
+      throw new Error(`Gagal menyimpan template awal ke Supabase: ${seedError.message}`);
+    }
+  } else {
+    const missingDefaults = INITIAL_TEMPLATES.filter(
+      (initial) =>
+        initial.id !== 'tmpl-sk-kgb' &&
+        initial.kategori !== 'sk_kgb' &&
+        !templates.some((template) => template.id === initial.id)
+    );
+    if (missingDefaults.length > 0) {
+      const { error: seedError } = await supabase
+        .from('template_dokumen')
+        .upsert(missingDefaults.map(mapTemplateToSupabase));
+      if (seedError) {
+        console.error('Supabase restore default templates error:', seedError);
+        throw new Error(`Gagal memulihkan template bawaan di Supabase: ${seedError.message}`);
+      }
+      templates = [...templates, ...missingDefaults];
+    }
+  }
+
+  cacheTemplates(templates);
+  return templates;
+}
+
 export async function saveTemplate(template: TemplateDokumen): Promise<TemplateDokumen> {
   const current = await getTemplatesList();
   const index = current.findIndex((t) => t.id === template.id);
-  let updated: TemplateDokumen[];
   const itemToSave: TemplateDokumen = {
     ...template,
     updatedAt: new Date().toISOString(),
   };
 
-  if (index >= 0) {
-    updated = [...current];
-    updated[index] = itemToSave;
-  } else {
-    updated = [itemToSave, ...current];
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    const { error } = await supabase
+      .from('template_dokumen')
+      .upsert(mapTemplateToSupabase(itemToSave));
+    if (error) {
+      console.error('Supabase save template error:', error);
+      throw new Error(`Gagal menyimpan template ke Supabase: ${error.message}`);
+    }
   }
 
-  safeLocalStorageSet(KEYS.TEMPLATES, updated);
+  const updated = [...current];
+  if (index >= 0) updated[index] = itemToSave;
+  else updated.unshift(itemToSave);
+  cacheTemplates(updated);
   return itemToSave;
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
   const current = await getTemplatesList();
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    const { error } = await supabase.from('template_dokumen').delete().eq('id', id);
+    if (error) {
+      console.error('Supabase delete template error:', error);
+      throw new Error(`Gagal menghapus template dari Supabase: ${error.message}`);
+    }
+  }
+
   const updated = current.filter((t) => t.id !== id);
-  safeLocalStorageSet(KEYS.TEMPLATES, updated);
+  cacheTemplates(updated);
 }
 
 export async function resetTemplatesToDefault(): Promise<TemplateDokumen[]> {
-  safeLocalStorageSet(KEYS.TEMPLATES, INITIAL_TEMPLATES);
-  return INITIAL_TEMPLATES;
+  const templates = INITIAL_TEMPLATES.filter(
+    (template) => template.id !== 'tmpl-sk-kgb' && template.kategori !== 'sk_kgb'
+  );
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    const { data, error: fetchError } = await supabase
+      .from('template_dokumen')
+      .select('id');
+    if (fetchError) {
+      console.error('Supabase list templates for reset error:', fetchError);
+      throw new Error(`Gagal memuat template untuk reset: ${fetchError.message}`);
+    }
+
+    const ids = (data || []).map((row) => row.id);
+    if (ids.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('template_dokumen')
+        .delete()
+        .in('id', ids);
+      if (deleteError) {
+        console.error('Supabase reset template delete error:', deleteError);
+        throw new Error(`Gagal menghapus template saat reset: ${deleteError.message}`);
+      }
+    }
+
+    const { error: upsertError } = await supabase
+      .from('template_dokumen')
+      .upsert(templates.map(mapTemplateToSupabase));
+    if (upsertError) {
+      console.error('Supabase reset template save error:', upsertError);
+      throw new Error(`Gagal menyimpan template bawaan ke Supabase: ${upsertError.message}`);
+    }
+  }
+
+  cacheTemplates(templates);
+  return templates;
 }
 
 // ======================== KOP SURAT REPOSITORY ========================

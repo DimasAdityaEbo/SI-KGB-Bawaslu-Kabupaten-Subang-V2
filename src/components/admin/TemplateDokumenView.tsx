@@ -151,7 +151,10 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
   };
 
   useEffect(() => {
-    loadTemplates();
+    loadTemplates().catch((error) => {
+      console.error('Error loading templates:', error);
+      showToast(error instanceof Error ? error.message : 'Gagal memuat template.', 'error');
+    });
   }, []);
 
   // Set default sample pegawai for preview
@@ -206,9 +209,14 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
 
   const handleResetDefaults = async () => {
     if (confirm('Yakin ingin mereset daftar template ke template standar bawaan Bawaslu Subang? Semua template bawaan yang dihapus akan dipulihkan.')) {
-      await resetTemplatesToDefault();
-      await loadTemplates();
-      showToast('Daftar template berhasil dikembalikan ke standar Bawaslu Subang.');
+      try {
+        await resetTemplatesToDefault();
+        await loadTemplates();
+        showToast('Daftar template berhasil dikembalikan ke standar Bawaslu Subang.');
+      } catch (error) {
+        console.error('Error resetting templates:', error);
+        showToast(error instanceof Error ? error.message : 'Gagal mereset template.', 'error');
+      }
     }
   };
 
@@ -239,10 +247,15 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
       updatedAt: new Date().toISOString(),
     };
 
-    await saveTemplate(payload);
-    await loadTemplates();
-    setIsEditorOpen(false);
-    showToast(`Template "${payload.nama}" berhasil disimpan.`);
+    try {
+      await saveTemplate(payload);
+      await loadTemplates();
+      setIsEditorOpen(false);
+      showToast(`Template "${payload.nama}" berhasil disimpan.`);
+    } catch (error) {
+      console.error('Error saving template:', error);
+      showToast(error instanceof Error ? error.message : 'Gagal menyimpan template.', 'error');
+    }
   };
 
   const insertVariableTag = (tag: string) => {

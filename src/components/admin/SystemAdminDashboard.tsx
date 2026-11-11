@@ -87,23 +87,7 @@ export const SystemAdminDashboard: React.FC<SystemAdminDashboardProps> = ({
               Pusat kendali akun pengguna (Admin, Kasubag, Pegawai), pemantauan pengiriman email notifikasi otomatis, dan status integrasi database cloud.
             </p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => onSelectTab('users')}
-              className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-900 hover:bg-slate-100 transition shadow"
-            >
-              <Users className="h-4 w-4 text-slate-700" />
-              <span>Kelola User</span>
-            </button>
-            <button
-              onClick={() => onSelectTab('email-logs')}
-              className="flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-white hover:bg-slate-700 border border-slate-700 transition"
-            >
-              <Mail className="h-4 w-4 text-sky-400" />
-              <span>Log Email</span>
-            </button>
-          </div>
+          
         </div>
       </div>
 

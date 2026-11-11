@@ -154,12 +154,13 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
         skKgbDoc = undefined;
       }
 
+      const verificationDate = new Date();
       const updated: PengajuanKGB = {
         ...activePengajuan,
         status: newStatus,
         catatanVerifikator: catatanVerifikasi.trim() || undefined,
         diverifikasiOleh: 'Kepala Sub Bagian Administrasi Bawaslu Subang',
-        tanggalVerifikasi: new Date().toISOString(),
+        tanggalVerifikasi: verificationDate.toISOString(),
         nomorSkKgbDiterbitkan: newStatus === 'disetujui' ? nomorSk : undefined,
         tanggalSkDiterbitkan:
           newStatus === 'disetujui'
@@ -171,42 +172,34 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
       // 1. Save data pengajuan safely
       await savePengajuan(updated);
 
-      // 2. Jika disetujui, perbarui jadwal KGB berikutnya milik pegawai menjadi 2 tahun setelah TMT KGB disetujui!
+      // 2. Saat pengajuan disetujui, jadwalkan KGB berikutnya dua tahun setelah tanggal persetujuan.
       let nextKgbFormatted: string | undefined = undefined;
       if (newStatus === 'disetujui') {
         const targetPegawai = pegawaiList.find((p) => p.id === activePengajuan.pegawaiId);
         if (targetPegawai) {
-          let baseYear: number;
-          let baseMonth: number;
-          let baseDay: number;
+          if (activePengajuan.status !== 'disetujui') {
+            const nextYear = verificationDate.getFullYear() + 2;
+            const month = verificationDate.getMonth();
+            const day = Math.min(
+              verificationDate.getDate(),
+              new Date(nextYear, month + 1, 0).getDate()
+            );
+            const nextKgbDate = new Date(nextYear, month, day);
+            const nextMonthStr = String(nextKgbDate.getMonth() + 1).padStart(2, '0');
+            const nextDayStr = String(nextKgbDate.getDate()).padStart(2, '0');
+            nextKgbFormatted = `${nextKgbDate.getFullYear()}-${nextMonthStr}-${nextDayStr}`;
 
-          // Ambil acuan dari tmtKgbBaru jika format YYYY-MM-DD valid, jika tidak gunakan tanggal hari ini
-          if (activePengajuan.tmtKgbBaru && activePengajuan.tmtKgbBaru.includes('-')) {
-            const parts = activePengajuan.tmtKgbBaru.split('-').map(Number);
-            baseYear = parts[0];
-            baseMonth = parts[1];
-            baseDay = parts[2] || 1;
+            const updatedPegawai: Pegawai = {
+              ...targetPegawai,
+              jadwalKgbBerikutnya: nextKgbFormatted,
+              gajiPokokTerakhir: activePengajuan.gajiBaruEstimasi || targetPegawai.gajiPokokTerakhir,
+              updatedAt: verificationDate.toISOString(),
+            };
+
+            await savePegawai(updatedPegawai);
           } else {
-            const now = new Date();
-            baseYear = now.getFullYear();
-            baseMonth = now.getMonth() + 1;
-            baseDay = now.getDate();
+            nextKgbFormatted = targetPegawai.jadwalKgbBerikutnya;
           }
-
-          // Majukan tepat 2 tahun ke depan
-          const nextYear = baseYear + 2;
-          const nextMonthStr = String(baseMonth).padStart(2, '0');
-          const nextDayStr = String(baseDay).padStart(2, '0');
-          nextKgbFormatted = `${nextYear}-${nextMonthStr}-${nextDayStr}`;
-
-          const updatedPegawai: Pegawai = {
-            ...targetPegawai,
-            jadwalKgbBerikutnya: nextKgbFormatted,
-            gajiPokokTerakhir: activePengajuan.gajiBaruEstimasi || targetPegawai.gajiPokokTerakhir,
-            updatedAt: new Date().toISOString(),
-          };
-
-          await savePegawai(updatedPegawai);
         }
       }
 

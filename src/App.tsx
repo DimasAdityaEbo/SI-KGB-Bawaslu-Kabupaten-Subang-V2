@@ -15,6 +15,7 @@ import {
   getEmailLogs,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  getCurrentSessionUser,
 } from './services/storage';
 import { getSavedSupabaseConfig, subscribeToSupabaseChanges } from './services/supabase';
 import { Header } from './components/Header';
@@ -40,7 +41,7 @@ import { LogEmailView } from './components/admin/LogEmailView';
 import { PengaturanKopSuratView } from './components/admin/PengaturanKopSuratView';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(getCurrentSessionUser);
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
 
   // Master Data States
@@ -91,9 +92,6 @@ export default function App() {
 
   useEffect(() => {
     loadAllData();
-    // Halaman pertama yang tampil saat membuka aplikasi selalu halaman login
-    setCurrentUser(null);
-    localStorage.removeItem('sikgb_session_user');
   }, [loadAllData]);
 
   useEffect(() => {
