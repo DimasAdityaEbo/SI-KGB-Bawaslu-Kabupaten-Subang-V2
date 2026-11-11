@@ -132,6 +132,7 @@ export interface TemplateDokumen {
   penandatanganNama: string;
   penandatanganJabatan: string;
   penandatanganNip: string;
+  penandatanganTtdUrl?: string;
   tembusan?: string[];
   isDefault?: boolean;
   createdAt: string;
@@ -191,4 +192,3 @@ export interface TandaTanganCapConfig {
 
   updatedAt?: string;
 }
-

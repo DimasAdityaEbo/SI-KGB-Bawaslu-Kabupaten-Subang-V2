@@ -102,6 +102,8 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
   const [formPejabatNama, setFormPejabatNama] = useState('H. TATANG KOSWARA, S.Sos., M.Si');
   const [formPejabatJabatan, setFormPejabatJabatan] = useState('Kepala Sekretariat Bawaslu Kabupaten Subang');
   const [formPejabatNip, setFormPejabatNip] = useState('197405121998031002');
+  const [formPejabatTtdUrl, setFormPejabatTtdUrl] = useState('');
+  const [isReadingPejabatTtd, setIsReadingPejabatTtd] = useState(false);
   const [formTembusan, setFormTembusan] = useState<string>('');
   const [feedbackToast, setFeedbackToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
@@ -175,8 +177,42 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
     setFormPejabatNama(t.penandatanganNama);
     setFormPejabatJabatan(t.penandatanganJabatan);
     setFormPejabatNip(t.penandatanganNip);
+    setFormPejabatTtdUrl(t.penandatanganTtdUrl || '');
     setFormTembusan((t.tembusan || []).join('\n'));
     setIsEditorOpen(true);
+  };
+
+  const handlePejabatTtdUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      showToast('File e-TTD harus berupa gambar PNG, JPG, atau WEBP.', 'error');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Ukuran file e-TTD maksimal 2 MB.', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        setIsReadingPejabatTtd(false);
+        showToast('Gagal membaca file e-TTD.', 'error');
+        return;
+      }
+      setFormPejabatTtdUrl(reader.result);
+      setIsReadingPejabatTtd(false);
+    };
+    reader.onerror = () => {
+      setIsReadingPejabatTtd(false);
+      showToast('Gagal membaca file e-TTD.', 'error');
+    };
+    setIsReadingPejabatTtd(true);
+    reader.readAsDataURL(file);
   };
 
   const handleConfirmDelete = async () => {
@@ -238,6 +274,7 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
       penandatanganNama: formPejabatNama.trim(),
       penandatanganJabatan: formPejabatJabatan.trim(),
       penandatanganNip: formPejabatNip.trim(),
+      penandatanganTtdUrl: formPejabatTtdUrl,
       tembusan: formTembusan
         .split('\n')
         .map((s) => s.trim())
@@ -737,6 +774,38 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Upload e-TTD Pejabat (PNG, JPG, WEBP; maks. 2 MB)
+                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handlePejabatTtdUpload}
+                      className="max-w-full text-xs text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:font-semibold file:text-slate-700 file:shadow-sm"
+                    />
+                    {formPejabatTtdUrl && (
+                      <>
+                        <img
+                          src={formPejabatTtdUrl}
+                          alt="Pratinjau e-TTD pejabat"
+                          className="h-16 max-w-40 rounded border border-slate-200 bg-white object-contain p-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setFormPejabatTtdUrl('')}
+                          className="rounded-lg border border-red-200 bg-white px-3 py-2 font-semibold text-red-700 hover:bg-red-50"
+                        >
+                          Hapus e-TTD
+                        </button>
+                      </>
+                    )}
+                    {isReadingPejabatTtd && (
+                      <span className="text-slate-500">Memproses file e-TTD...</span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Tembusan */}
@@ -780,10 +849,15 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
                   </button>
                   <button
                     type="submit"
+                    disabled={isReadingPejabatTtd}
                     className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-5 py-2 font-bold text-white hover:bg-slate-800 transition shadow"
                   >
-                    <Check className="h-4 w-4 text-emerald-400" />
-                    <span>Simpan Template</span>
+                    {isReadingPejabatTtd ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4 text-emerald-400" />
+                    )}
+                    <span>{isReadingPejabatTtd ? 'Memproses e-TTD...' : 'Simpan Template'}</span>
                   </button>
                 </div>
               </div>
@@ -970,7 +1044,14 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
                       </div>
 
                       <TandaTanganCapBlock
-                        config={ttdCapConfig}
+                        config={{
+                          ...ttdCapConfig,
+                          tandaTanganUrl:
+                            previewTemplate.penandatanganTtdUrl || ttdCapConfig.tandaTanganUrl,
+                          tampilkanTandaTangan: previewTemplate.penandatanganTtdUrl
+                            ? true
+                            : ttdCapConfig.tampilkanTandaTangan,
+                        }}
                         tanggalText={rendered.tanggalFormatted}
                         customNamaPejabat={previewTemplate.penandatanganNama}
                         customJabatan={previewTemplate.penandatanganJabatan}
@@ -978,7 +1059,7 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
                         align="right"
                         mode="pimpinan_saja"
                         hideCap
-                        hideSignature
+                        hideSignature={!previewTemplate.penandatanganTtdUrl}
                         className="mt-10"
                       />
 

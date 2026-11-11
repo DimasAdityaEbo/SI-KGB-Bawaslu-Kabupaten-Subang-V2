@@ -555,7 +555,11 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
                 {/* BLOK TANDA TANGAN RESMI */}
                 <div className="pt-6 flex justify-end">
                   <TandaTanganCapBlock
-                    config={ttdCapConfig}
+                    config={{
+                      ...ttdCapConfig,
+                      tandaTanganUrl: activeTemplate?.penandatanganTtdUrl || '',
+                      tampilkanTandaTangan: Boolean(activeTemplate?.penandatanganTtdUrl),
+                    }}
                     mode="pimpinan_saja"
                     tanggalText={resolvedDocument.tanggalFormatted}
                     customNamaPejabat={activeTemplate?.penandatanganNama}
@@ -563,7 +567,7 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
                     customNip={activeTemplate?.penandatanganNip}
                     align="right"
                     hideCap={true}
-                    hideSignature={true}
+                    hideSignature={!activeTemplate?.penandatanganTtdUrl}
                   />
                 </div>
 

@@ -833,6 +833,7 @@ function mapSupabaseTemplate(row: Record<string, unknown>): TemplateDokumen {
     penandatanganNama: text(metadata.penandatanganNama),
     penandatanganJabatan: text(metadata.penandatanganJabatan),
     penandatanganNip: text(metadata.penandatanganNip),
+    penandatanganTtdUrl: text(metadata.penandatanganTtdUrl),
     tembusan: Array.isArray(metadata.tembusan)
       ? metadata.tembusan.filter((item): item is string => typeof item === 'string')
       : [],
@@ -855,6 +856,7 @@ function mapTemplateToSupabase(template: TemplateDokumen): Record<string, unknow
       penandatanganNama: template.penandatanganNama,
       penandatanganJabatan: template.penandatanganJabatan,
       penandatanganNip: template.penandatanganNip,
+      penandatanganTtdUrl: template.penandatanganTtdUrl || '',
       tembusan: template.tembusan || [],
     },
     terakhir_diubah: template.updatedAt || template.createdAt,
