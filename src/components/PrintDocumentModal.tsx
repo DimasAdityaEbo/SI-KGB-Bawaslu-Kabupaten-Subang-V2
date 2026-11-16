@@ -29,6 +29,7 @@ import { exportElementToPdf } from '../services/pdfExport';
 import { KopSuratHeader } from './KopSuratHeader';
 import { KopSuratModal } from './admin/KopSuratModal';
 import { TandaTanganCapBlock } from './TandaTanganCapBlock';
+import { showErrorDialog } from '../services/alerts';
 
 interface PrintDocumentModalProps {
   isOpen: boolean;
@@ -288,15 +289,6 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
     return templates.find((t) => t.id === selectedTemplateId) || templates[0];
   }, [templates, selectedTemplateId]);
 
-  const formatRupiah = (val?: number) => {
-    if (!val) return 'Rp 0,-';
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0,
-    }).format(val);
-  };
-
   // Variable replacement logic adhering strictly to the prepared template
   const resolvedDocument = useMemo(() => {
     if (!isOpen || !activeTemplate || !pengajuan) return null;
@@ -336,12 +328,6 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
       year: 'numeric',
     });
 
-    const gajiLamaFormatted = formatRupiah(pengajuan.gajiLama || pegawai?.gajiPokokTerakhir);
-    const gajiBaruFormatted = formatRupiah(
-      pengajuan.gajiBaruEstimasi ||
-        (pegawai?.gajiPokokTerakhir ? pegawai.gajiPokokTerakhir + 160000 : 3980000)
-    );
-
     const namaPegawai = pengajuan.namaPemohon || pegawai?.nama || 'Pegawai';
     const nip = pengajuan.nipPemohon || pegawai?.nip || '-';
     const pangkatGol = pegawai?.golonganPangkat || 'Penata Muda / III/a';
@@ -359,8 +345,8 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
     content = content.replace(/\{UNIT_KERJA\}/g, unitKerja);
     content = content.replace(/\{TMT_KGB_BARU\}/g, pengajuan.tmtKgbBaru || '');
     content = content.replace(/\{TMT_KGB_FORMAT\}/g, tmtFormatted);
-    content = content.replace(/\{GAJI_POKOK_LAMA\}/g, gajiLamaFormatted);
-    content = content.replace(/\{GAJI_POKOK_BARU\}/g, gajiBaruFormatted);
+    content = content.replace(/\{GAJI_POKOK_LAMA\}/g, '');
+    content = content.replace(/\{GAJI_POKOK_BARU\}/g, '');
     content = content.replace(/\{NOMOR_SURAT\}/g, nomorFinal);
     content = content.replace(/\{TANGGAL_SURAT\}/g, dateFormatted);
     content = content.replace(/\{NAMA_PEJABAT\}/g, activeTemplate.penandatanganNama);
@@ -386,8 +372,6 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
       tanggalFormatted: dateFormatted,
       renderedContent: content,
       tmtFormatted,
-      gajiLamaFormatted,
-      gajiBaruFormatted,
       namaPegawai,
       nip,
       pangkatGol,
@@ -409,7 +393,7 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
       });
     } catch (err) {
       console.error('Download PDF error:', err);
-      alert('Gagal mengunduh dokumen PDF. Silakan coba kembali.');
+      void showErrorDialog('Gagal mengunduh dokumen PDF. Silakan coba kembali.');
     } finally {
       setIsDownloading(false);
     }

@@ -24,6 +24,7 @@ import {
   createGmailComposeUrl,
   createMailtoUrl,
 } from '../../services/emailService';
+import { confirmDialog, showErrorDialog } from '../../services/alerts';
 
 interface AdminDashboardProps {
   pegawaiList: Pegawai[];
@@ -100,9 +101,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         mailtoUrl,
         plainText,
       });
-    } catch (e: any) {
+    } catch (e) {
       console.error('Error sending reminder:', e);
-      alert(`Gagal mengirim pengingat: ${e?.message || 'Terjadi kesalahan sistem'}`);
+      void showErrorDialog(
+        `Gagal mengirim pengingat: ${e instanceof Error ? e.message : 'Terjadi kesalahan sistem'}`
+      );
     } finally {
       setSendingReminderId(null);
     }
@@ -111,13 +114,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Handle Kirim Pengingat ke Semua Pegawai H-30
   const handleSendBatchReminders = async () => {
     if (upcomingKgbList.length === 0) return;
-    if (
-      !confirm(
-        `Kirim pengingat email ke seluruh ${upcomingKgbList.length} pegawai yang jadwal KGB-nya dalam 30 hari ke depan?`
-      )
-    ) {
-      return;
-    }
+    if (!(await confirmDialog(
+      `Kirim pengingat email ke seluruh ${upcomingKgbList.length} pegawai yang jadwal KGB-nya dalam 30 hari ke depan?`,
+      'Kirim pengingat massal?',
+      'Ya, kirim'
+    ))) return;
 
     setIsSendingBatch(true);
     try {
@@ -131,7 +132,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setTimeout(() => setReminderSuccess(null), 5000);
     } catch (e) {
       console.error(e);
-      alert('Terjadi kesalahan saat mengirim pengingat massal.');
+      void showErrorDialog('Terjadi kesalahan saat mengirim pengingat massal.');
     } finally {
       setIsSendingBatch(false);
     }

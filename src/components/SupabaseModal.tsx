@@ -20,6 +20,7 @@ import {
 } from '../services/supabase';
 import { createClient } from '@supabase/supabase-js';
 import { Pegawai, User, PengajuanKGB } from '../types';
+import { showErrorDialog, showSuccessDialog, showWarningDialog } from '../services/alerts';
 
 interface SupabaseModalProps {
   isOpen: boolean;
@@ -45,7 +46,6 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({
   const [copiedSql, setCopiedSql] = useState(false);
   const [copiedMigrationSql, setCopiedMigrationSql] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);
   const [showSqlPreview, setShowSqlPreview] = useState(false);
 
   useEffect(() => {
@@ -54,7 +54,6 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({
       setUrl(config.url || '');
       setAnonKey(config.anonKey || '');
       setTestResult(null);
-      setSyncResult(null);
     }
   }, [isOpen]);
 
@@ -110,17 +109,21 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const cleanUrl = normalizeSupabaseUrl(url);
     const cleanKey = anonKey.trim();
-    saveSupabaseConfig(cleanUrl, cleanKey);
-    setUrl(cleanUrl);
-    resetSupabaseClient();
-    onConfigChanged();
-    setTestResult({
-      success: true,
-      message: 'Konfigurasi Supabase berhasil disimpan dan terhubung!',
-    });
+    try {
+      saveSupabaseConfig(cleanUrl, cleanKey);
+      setUrl(cleanUrl);
+      resetSupabaseClient();
+      onConfigChanged();
+      await showSuccessDialog('Konfigurasi Supabase berhasil disimpan dan diperbarui.');
+    } catch (error) {
+      console.error('Gagal menyimpan konfigurasi Supabase:', error);
+      await showErrorDialog(
+        error instanceof Error ? error.message : 'Konfigurasi Supabase gagal disimpan.'
+      );
+    }
   };
 
   const handleCopySql = () => {
@@ -133,10 +136,35 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({
     const migrationSql = `ALTER TABLE public.pegawai
   ALTER COLUMN tanggal_lahir DROP NOT NULL,
   ALTER COLUMN tanggal_pelantikan DROP NOT NULL,
-  ALTER COLUMN jadwal_kgb_berikutnya DROP NOT NULL;
-ALTER TABLE public.pengajuan_kgb
-  ADD COLUMN IF NOT EXISTS dokumen_sk_kgb_diterbitkan JSONB;
+  ALTER COLUMN jadwal_kgb_berikutnya DROP NOT NULL,
+  DROP COLUMN IF EXISTS gaji_pokok_terakhir,
+  DROP COLUMN IF EXISTS pangkat_terakhir;
 ALTER TABLE public.pengajuan_kgb DROP CONSTRAINT IF EXISTS pengajuan_kgb_status_check;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'pengajuan_kgb'
+      AND column_name = 'dokumen_pendukung_lain'
+  ) THEN
+    EXECUTE $migration$
+      UPDATE public.pengajuan_kgb
+      SET status = 'dikirim_ke_provinsi'
+      WHERE status IN ('dalam_proses', 'menunggu_verifikasi')
+        AND COALESCE(
+          dokumen_pendukung_lain->>'_sub_status',
+          dokumen_pendukung_lain->>'_actualStatus'
+        ) = 'dikirim_ke_provinsi'
+    $migration$;
+  END IF;
+END $$;
+ALTER TABLE public.pengajuan_kgb
+  ADD COLUMN IF NOT EXISTS dokumen_sk_kgb_diterbitkan JSONB,
+  DROP COLUMN IF EXISTS gaji_lama,
+  DROP COLUMN IF EXISTS gaji_baru_estimasi,
+  DROP COLUMN IF EXISTS dokumen_pendukung_lain;
 ALTER TABLE public.pengajuan_kgb ADD CONSTRAINT pengajuan_kgb_status_check 
   CHECK (status IN ('menunggu_verifikasi', 'dalam_proses', 'dikirim_ke_provinsi', 'perlu_perbaikan', 'disetujui', 'ditolak'));
 ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_role_check;
@@ -172,15 +200,11 @@ END $$;`;
     const cleanKey = anonKey.trim();
 
     if (!cleanUrl || !cleanKey) {
-      setSyncResult({
-        success: false,
-        message: 'Harap simpan URL dan Anon Key Supabase terlebih dahulu.',
-      });
+      void showWarningDialog('Harap simpan URL dan Anon Key Supabase terlebih dahulu.');
       return;
     }
 
     setSyncing(true);
-    setSyncResult(null);
 
     try {
       const client = createClient(cleanUrl, cleanKey);
@@ -202,9 +226,7 @@ END $$;`;
         agama: p.agama,
         tanggal_pelantikan: p.tanggalPelantikan,
         jadwal_kgb_berikutnya: p.jadwalKgbBerikutnya,
-        gaji_pokok_terakhir: p.gajiPokokTerakhir,
         golongan_pangkat: p.golonganPangkat,
-        pangkat_terakhir: p.pangkatTerakhir,
       }));
 
       const { error: errPegawai } = await client.from('pegawai').upsert(pegawaiPayload);
@@ -238,12 +260,9 @@ END $$;`;
         perihal: item.perihal,
         periode_kgb: item.periodeKgb,
         tmt_kgb_baru: item.tmtKgbBaru,
-        gaji_lama: item.gajiLama,
-        gaji_baru_estimasi: item.gajiBaruEstimasi,
         sk_pangkat_terakhir: item.skPangkatTerakhir,
         sk_gaji_berkala_terakhir: item.skGajiBerkalaTerakhir,
         dokumen_skp_prestasi: item.dokumenSkpPrestasi,
-        dokumen_pendukung_lain: item.dokumenPendukungLain,
         catatan_pemohon: item.catatanPemohon,
         status: item.status,
         catatan_verifikator: item.catatanVerifikator,
@@ -256,16 +275,15 @@ END $$;`;
       const { error: errKgb } = await client.from('pengajuan_kgb').upsert(pengajuanPayload);
       if (errKgb) throw new Error(`Pengajuan: ${errKgb.message}`);
 
-      setSyncResult({
-        success: true,
-        message: `Sukses! Berhasil menyinkronkan ${allPegawai.length} Pegawai, ${allUsers.length} User, dan ${allPengajuan.length} Pengajuan KGB ke Supabase.`,
-      });
+      await showSuccessDialog(
+        `Berhasil menyinkronkan ${allPegawai.length} pegawai, ${allUsers.length} pengguna, dan ${allPengajuan.length} pengajuan KGB ke Supabase.`
+      );
       onConfigChanged();
-    } catch (err: any) {
-      setSyncResult({
-        success: false,
-        message: `Gagal sinkronisasi data: ${err.message}. Pastikan skema tabel sudah dijalankan di Supabase.`,
-      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      await showErrorDialog(
+        `Gagal sinkronisasi data: ${errorMessage}. Pastikan skema tabel sudah dijalankan di Supabase.`
+      );
     } finally {
       setSyncing(false);
     }
@@ -390,23 +408,6 @@ END $$;`;
                 <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
               )}
               <div className="leading-relaxed">{testResult.message}</div>
-            </div>
-          )}
-
-          {syncResult && (
-            <div
-              className={`flex items-start gap-2.5 rounded-lg p-3 ${
-                syncResult.success
-                  ? 'border border-sky-200 bg-sky-50 text-sky-900'
-                  : 'border border-red-200 bg-red-50 text-red-900'
-              }`}
-            >
-              {syncResult.success ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-sky-600 mt-0.5" />
-              ) : (
-                <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
-              )}
-              <div className="leading-relaxed">{syncResult.message}</div>
             </div>
           )}
 

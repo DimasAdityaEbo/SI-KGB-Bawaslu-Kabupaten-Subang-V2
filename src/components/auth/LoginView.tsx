@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User } from '../../types';
 import { Lock, User as UserIcon, Eye, EyeOff, ArrowRight, Info, ShieldCheck } from 'lucide-react';
 import { BawasluLogo } from '../BawasluLogo';
+import Swal from 'sweetalert2';
 
 interface LoginViewProps {
   onLogin: (user: User) => void;
@@ -12,11 +13,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, usersList }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
+
+    if (!username.trim() || !password.trim()) {
+      void Swal.fire({
+        icon: 'warning',
+        title: 'Data belum lengkap',
+        text: 'Silakan masukkan username dan password.',
+      });
+      return;
+    }
 
     const user = usersList.find(
       (u) =>
@@ -25,12 +33,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, usersList }) => {
     );
 
     if (!user) {
-      setErrorMessage('Username atau password salah. Silakan coba kembali.');
+      void Swal.fire({
+        icon: 'error',
+        title: 'Login gagal',
+        text: 'Username atau password salah. Silakan coba kembali.',
+      });
       return;
     }
 
     if (user.status === 'nonaktif') {
-      setErrorMessage('Akun Anda dinonaktifkan oleh administrator kepegawaian.');
+      void Swal.fire({
+        icon: 'error',
+        title: 'Akun dinonaktifkan',
+        text: 'Akun Anda dinonaktifkan oleh administrator kepegawaian.',
+      });
       return;
     }
 
@@ -65,12 +81,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, usersList }) => {
             </p>
           </div>
 
-          {errorMessage && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
-              {errorMessage}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
@@ -80,7 +90,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, usersList }) => {
                 <UserIcon className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <input
                   type="text"
-                  required
                   placeholder="Masukkan username..."
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -97,7 +106,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, usersList }) => {
                 <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  required
                   placeholder="Masukkan password..."
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

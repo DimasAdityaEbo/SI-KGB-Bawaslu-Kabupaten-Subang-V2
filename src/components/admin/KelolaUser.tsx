@@ -14,6 +14,12 @@ import {
 } from 'lucide-react';
 import { User, Pegawai, UserRole } from '../../types';
 import { saveUser, deleteUser } from '../../services/storage';
+import {
+  confirmDeleteDialog,
+  showErrorDialog,
+  showSuccessDialog,
+  showWarningDialog,
+} from '../../services/alerts';
 
 interface KelolaUserProps {
   usersList: User[];
@@ -72,9 +78,14 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Yakin ingin menghapus akun pengguna "${name}"?`)) {
+    if (!(await confirmDeleteDialog(`Yakin ingin menghapus akun pengguna "${name}"?`))) return;
+    try {
       await deleteUser(id);
       onRefreshData();
+      await showSuccessDialog(`Akun pengguna "${name}" berhasil dihapus.`);
+    } catch (error) {
+      console.error('Gagal menghapus akun pengguna:', error);
+      await showErrorDialog(error instanceof Error ? error.message : 'Akun pengguna gagal dihapus.');
     }
   };
 
@@ -85,12 +96,12 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
 
     const cleanUsername = username.trim().toLowerCase();
     if (!cleanUsername) {
-      setFormError('Username tidak boleh kosong!');
+      void showWarningDialog('Username tidak boleh kosong!');
       return;
     }
 
     if (!namaLengkap.trim()) {
-      setFormError('Nama lengkap pengguna wajib diisi!');
+      void showWarningDialog('Nama lengkap pengguna wajib diisi!');
       return;
     }
 
@@ -99,7 +110,7 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
       (u) => u.username.toLowerCase() === cleanUsername && u.id !== selectedUser?.id
     );
     if (duplicate) {
-      setFormError(
+      void showWarningDialog(
         `Username "${cleanUsername}" sudah digunakan oleh akun "${duplicate.namaLengkap}". Silakan gunakan username lain.`
       );
       return;
@@ -126,6 +137,7 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
       setIsModalOpen(false);
       setSelectedUser(null);
       onRefreshData();
+      await showSuccessDialog(`Akun "${userPayload.username}" berhasil diperbarui.`);
     } catch (err: any) {
       console.warn('KelolaUser submit caught error:', err);
       if (
@@ -133,6 +145,9 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
         err.message?.includes('users_role_check') ||
         err.message?.includes('violates check constraint')
       ) {
+        await showErrorDialog(
+          'Akun tersimpan secara lokal, tetapi pembaruan ke Supabase gagal. Jalankan migrasi yang ditampilkan pada formulir.'
+        );
         setFormError(
           `Akun berhasil diperbarui dan disimpan secara lokal. Namun database cloud Supabase Anda menolak role 'kasubag' karena tabel masih memakai constraint lama. Jalankan migrasi berikut di Supabase SQL Editor:`
         );
@@ -142,7 +157,9 @@ export const KelolaUser: React.FC<KelolaUserProps> = ({
         // Refresh anyway so local user appears in table
         onRefreshData();
       } else {
-        setFormError(err.message || 'Gagal menyimpan pengguna. Silakan coba kembali.');
+        const errorMessage = err.message || 'Gagal menyimpan pengguna. Silakan coba kembali.';
+        setFormError(errorMessage);
+        await showErrorDialog(errorMessage);
       }
     } finally {
       setIsSaving(false);

@@ -19,6 +19,7 @@ import {
   DEFAULT_KOP_SURAT,
 } from '../../services/storage';
 import { KopSuratHeader } from '../KopSuratHeader';
+import { confirmDialog, showErrorDialog, showSuccessDialog, showWarningDialog } from '../../services/alerts';
 
 interface PengaturanKopSuratViewProps {
   onRefreshData?: () => void;
@@ -28,18 +29,17 @@ export const PengaturanKopSuratView: React.FC<PengaturanKopSuratViewProps> = ({
   onRefreshData,
 }) => {
   const [config, setConfig] = useState<KopSuratConfig>(getKopSuratConfig());
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleImageFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
-      alert('File harus berupa gambar (PNG, JPG, SVG, WebP)!');
+      void showWarningDialog('File harus berupa gambar (PNG, JPG, SVG, WebP)!');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('Ukuran gambar maksimal 5 MB!');
+      void showWarningDialog('Ukuran gambar maksimal 5 MB!');
       return;
     }
 
@@ -72,7 +72,10 @@ export const PengaturanKopSuratView: React.FC<PengaturanKopSuratViewProps> = ({
     }
   };
 
-  const handleRemoveCustomLogo = () => {
+  const handleRemoveCustomLogo = async () => {
+    if (!(await confirmDialog('Logo kustom akan dihapus dari pengaturan kop surat.', 'Hapus logo kustom?', 'Ya, hapus'))) {
+      return;
+    }
     setConfig((prev) => ({
       ...prev,
       logoUrl: '',
@@ -82,31 +85,38 @@ export const PengaturanKopSuratView: React.FC<PengaturanKopSuratViewProps> = ({
     }
   };
 
-  const handleResetToDefault = () => {
-    if (
-      confirm(
-        'Yakin ingin mengembalikan seluruh pengaturan kop surat ke format standar Bawaslu Kabupaten Subang?'
-      )
-    ) {
+  const handleResetToDefault = async () => {
+    if (!(await confirmDialog(
+      'Yakin ingin mengembalikan seluruh pengaturan kop surat ke format standar Bawaslu Kabupaten Subang?',
+      'Reset kop surat?',
+      'Ya, reset'
+    ))) return;
+    try {
       const reset = resetKopSuratConfig(true);
       setConfig(reset);
-      setSuccessMsg('Kop surat berhasil direset ke standar Bawaslu Subang.');
-      setTimeout(() => setSuccessMsg(null), 3000);
       if (onRefreshData) onRefreshData();
+      await showSuccessDialog('Kop surat berhasil direset ke standar Bawaslu Subang.');
+    } catch (error) {
+      console.error('Gagal mereset kop surat:', error);
+      await showErrorDialog(error instanceof Error ? error.message : 'Kop surat gagal direset.');
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!config.namaInstansiUtama.trim()) {
-      alert('Nama Instansi Utama wajib diisi!');
+      void showWarningDialog('Nama Instansi Utama wajib diisi!');
       return;
     }
 
-    saveKopSuratConfig(config, true);
-    setSuccessMsg('Pengaturan Kop Surat berhasil disimpan dan langsung diterapkan ke dokumen cetak!');
-    setTimeout(() => setSuccessMsg(null), 4000);
-    if (onRefreshData) onRefreshData();
+    try {
+      saveKopSuratConfig(config, true);
+      if (onRefreshData) onRefreshData();
+      await showSuccessDialog('Pengaturan kop surat berhasil disimpan dan diperbarui.');
+    } catch (error) {
+      console.error('Gagal menyimpan pengaturan kop surat:', error);
+      await showErrorDialog(error instanceof Error ? error.message : 'Pengaturan kop surat gagal disimpan.');
+    }
   };
 
   return (
@@ -137,13 +147,6 @@ export const PengaturanKopSuratView: React.FC<PengaturanKopSuratViewProps> = ({
           </button>
         </div>
       </div>
-
-      {successMsg && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-xs font-semibold text-emerald-800 shadow-xs">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-          <span>{successMsg}</span>
-        </div>
-      )}
 
       {/* REALTIME LIVE PREVIEW BOX */}
       <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 shadow-xs">

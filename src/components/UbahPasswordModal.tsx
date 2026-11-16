@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, KeyRound, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, Check } from 'lucide-react';
+import { X, KeyRound, Lock, Eye, EyeOff, Check } from 'lucide-react';
 import { User } from '../types';
 import { saveUser } from '../services/storage';
+import { showErrorDialog, showSuccessDialog } from '../services/alerts';
 
 interface UbahPasswordModalProps {
   isOpen: boolean;
@@ -24,38 +25,34 @@ export const UbahPasswordModal: React.FC<UbahPasswordModalProps> = ({
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
-    setSuccessMessage(null);
 
     // Validate current password
     if (currentPassword !== currentUser.password) {
-      setErrorMessage('Password saat ini yang Anda masukkan salah.');
+      void showErrorDialog('Password saat ini yang Anda masukkan salah.');
       return;
     }
 
     // Validate new password length
     if (newPassword.length < 6) {
-      setErrorMessage('Password baru minimal 6 karakter.');
+      void showErrorDialog('Password baru minimal 6 karakter.');
       return;
     }
 
     // Check if new password is same as current password
     if (newPassword === currentPassword) {
-      setErrorMessage('Password baru tidak boleh sama dengan password saat ini.');
+      void showErrorDialog('Password baru tidak boleh sama dengan password saat ini.');
       return;
     }
 
     // Check confirmation
     if (newPassword !== confirmPassword) {
-      setErrorMessage('Konfirmasi password baru tidak sesuai.');
+      void showErrorDialog('Konfirmasi password baru tidak sesuai.');
       return;
     }
 
@@ -68,19 +65,17 @@ export const UbahPasswordModal: React.FC<UbahPasswordModalProps> = ({
 
       await saveUser(updatedUser);
       onPasswordChanged(updatedUser);
-      setSuccessMessage('Password berhasil diubah! Gunakan password baru Anda untuk login berikutnya.');
       
       // Reset form fields
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
 
-      setTimeout(() => {
-        setSuccessMessage(null);
-        onClose();
-      }, 2000);
-    } catch (err: any) {
-      setErrorMessage('Gagal memperbarui password. Silakan coba kembali.');
+      await showSuccessDialog('Password berhasil diubah. Gunakan password baru Anda untuk login berikutnya.');
+      onClose();
+    } catch (err) {
+      console.error('Gagal memperbarui password:', err);
+      await showErrorDialog('Gagal memperbarui password. Silakan coba kembali.');
     } finally {
       setIsSubmitting(false);
     }
@@ -107,21 +102,6 @@ export const UbahPasswordModal: React.FC<UbahPasswordModalProps> = ({
             <X className="h-4 w-4" />
           </button>
         </div>
-
-        {/* Alerts */}
-        {errorMessage && (
-          <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900">
-            <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-            <span>{successMessage}</span>
-          </div>
-        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">

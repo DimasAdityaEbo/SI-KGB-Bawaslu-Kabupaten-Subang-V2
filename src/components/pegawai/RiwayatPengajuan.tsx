@@ -21,6 +21,7 @@ import { sendKgbStatusEmail } from '../../services/emailService';
 import { PrintDocumentModal } from '../PrintDocumentModal';
 import { DocumentViewerModal } from '../DocumentViewerModal';
 import { downloadDokumenFile, readFileAsDataUrl } from '../../services/documentUtils';
+import { confirmDeleteDialog, showErrorDialog, showSuccessDialog, showWarningDialog } from '../../services/alerts';
 
 interface RiwayatPengajuanProps {
   pegawai: Pegawai;
@@ -60,25 +61,23 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [printMode, setPrintMode] = useState<'surat_pengantar' | 'tanda_terima' | 'sk_kgb'>('tanda_terima');
 
-  // Delete pengajuan state
-  const [deleteTarget, setDeleteTarget] = useState<PengajuanKGB | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const handleDeletePengajuan = async (target: PengajuanKGB) => {
+    if (!(await confirmDeleteDialog(
+      `Anda akan menghapus pengajuan KGB ${target.noPengajuan}. Tindakan ini permanen dan pengajuan baru dapat dibuat setelahnya.`
+    ))) return;
 
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
     try {
-      await deletePengajuan(deleteTarget.id);
-      if (activePengajuan?.id === deleteTarget.id) {
+      await deletePengajuan(target.id);
+      if (activePengajuan?.id === target.id) {
         setActivePengajuan(null);
       }
-      setDeleteTarget(null);
       onRefreshData();
-    } catch (err: any) {
+      await showSuccessDialog(`Pengajuan ${target.noPengajuan} berhasil dihapus.`);
+    } catch (err) {
       console.error('Error deleting pengajuan:', err);
-      alert(`Gagal menghapus pengajuan: ${err?.message || 'Terjadi kesalahan sistem'}`);
-    } finally {
-      setIsDeleting(false);
+      await showErrorDialog(
+        `Gagal menghapus pengajuan: ${err instanceof Error ? err.message : 'Terjadi kesalahan sistem'}`
+      );
     }
   };
 
@@ -106,11 +105,12 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
 
   const handleSubmitRevision = async () => {
     if (!activePengajuan || !revisionFile) {
-      alert('Harap pilih berkas revisi yang diminta verifikator.');
+      void showWarningDialog('Harap pilih berkas revisi yang diminta verifikator.');
       return;
     }
 
     setIsSubmittingRevision(true);
+    let revisionSaved = false;
     try {
       const revisionFileData = await readFileAsDataUrl(revisionFile);
 
@@ -133,15 +133,21 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
       };
 
       await savePengajuan(updated);
+      revisionSaved = true;
       await sendKgbStatusEmail(updated, 'dibuat');
 
       setActivePengajuan(updated);
       setIsRevising(false);
       onRefreshData();
-      alert('Berkas perbaikan berhasil dikirimkan kembali untuk diverifikasi!');
+      await showSuccessDialog('Berkas perbaikan berhasil dikirimkan kembali untuk diverifikasi!');
     } catch (e) {
       console.error(e);
-      alert('Gagal mengirimkan berkas revisi.');
+      if (revisionSaved) onRefreshData();
+      await showErrorDialog(
+        revisionSaved
+          ? 'Berkas revisi tersimpan, tetapi notifikasi gagal dikirim.'
+          : 'Gagal menyimpan berkas revisi.'
+      );
     } finally {
       setIsSubmittingRevision(false);
     }
@@ -301,7 +307,7 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
                         </button>
                         {item.status !== 'disetujui' && (
                           <button
-                            onClick={() => setDeleteTarget(item)}
+                            onClick={() => void handleDeletePengajuan(item)}
                             className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 p-2 text-red-600 hover:bg-red-100 hover:border-red-300 transition"
                             title={`Hapus Berkas Pengajuan ${item.noPengajuan}`}
                           >
@@ -787,7 +793,7 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
                 {activePengajuan.status !== 'disetujui' ? (
                   <button
                     type="button"
-                    onClick={() => setDeleteTarget(activePengajuan)}
+                    onClick={() => void handleDeletePengajuan(activePengajuan)}
                     className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 transition shadow-2xs"
                     title="Hapus berkas permohonan pengajuan KGB ini"
                   >
@@ -852,58 +858,6 @@ export const RiwayatPengajuan: React.FC<RiwayatPengajuanProps> = ({
         pengajuan={activePengajuan || undefined}
       />
 
-      {/* ================= MODAL KONFIRMASI HAPUS PENGAJUAN PEGAWAI ================= */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl text-xs space-y-4 animate-in fade-in zoom-in-95">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
-                <AlertTriangle className="h-5 w-5" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900">
-                  Batalkan &amp; Hapus Pengajuan KGB?
-                </h3>
-                <p className="text-slate-600 leading-relaxed text-[11px]">
-                  Anda akan menghapus berkas pengajuan KGB <strong>{deleteTarget.noPengajuan}</strong>. Tindakan ini permanen. Setelah dihapus, Anda dapat mengajukan berkas baru dari awal.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-1 text-[11px] text-slate-600">
-              <div className="flex justify-between">
-                <span>Perihal:</span>
-                <span className="font-semibold text-slate-800">{deleteTarget.perihal}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tanggal Diajukan:</span>
-                <span className="font-semibold text-slate-800">
-                  {new Date(deleteTarget.tanggalPengajuan).toLocaleDateString('id-ID')}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50 transition"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleConfirmDelete}
-                className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700 transition shadow disabled:opacity-50"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Pengajuan'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

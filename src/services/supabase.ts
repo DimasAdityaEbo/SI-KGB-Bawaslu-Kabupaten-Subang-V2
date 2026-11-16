@@ -152,9 +152,7 @@ CREATE TABLE IF NOT EXISTS public.pegawai (
   agama TEXT NOT NULL,
   tanggal_pelantikan DATE,
   jadwal_kgb_berikutnya DATE,
-  gaji_pokok_terakhir NUMERIC DEFAULT 0,
   golongan_pangkat TEXT,
-  pangkat_terakhir TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -187,12 +185,9 @@ CREATE TABLE IF NOT EXISTS public.pengajuan_kgb (
   perihal TEXT NOT NULL,
   periode_kgb TEXT NOT NULL,
   tmt_kgb_baru DATE NOT NULL,
-  gaji_lama NUMERIC,
-  gaji_baru_estimasi NUMERIC,
   sk_pangkat_terakhir JSONB NOT NULL,
   sk_gaji_berkala_terakhir JSONB,
   dokumen_skp_prestasi JSONB NOT NULL,
-  dokumen_pendukung_lain JSONB,
   catatan_pemohon TEXT,
   status TEXT NOT NULL DEFAULT 'menunggu_verifikasi' CHECK (
     status IN ('menunggu_verifikasi', 'dalam_proses', 'dikirim_ke_provinsi', 'perlu_perbaikan', 'disetujui', 'ditolak')
@@ -335,13 +330,38 @@ EXCEPTION
 END $$;
 
 -- Penyesuaian kolom & constraint jika tabel sudah ada sebelumnya
+ALTER TABLE public.pengajuan_kgb DROP CONSTRAINT IF EXISTS pengajuan_kgb_status_check;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'pengajuan_kgb'
+      AND column_name = 'dokumen_pendukung_lain'
+  ) THEN
+    EXECUTE $migration$
+      UPDATE public.pengajuan_kgb
+      SET status = 'dikirim_ke_provinsi'
+      WHERE status IN ('dalam_proses', 'menunggu_verifikasi')
+        AND COALESCE(
+          dokumen_pendukung_lain->>'_sub_status',
+          dokumen_pendukung_lain->>'_actualStatus'
+        ) = 'dikirim_ke_provinsi'
+    $migration$;
+  END IF;
+END $$;
 ALTER TABLE public.pegawai
   ALTER COLUMN tanggal_lahir DROP NOT NULL,
   ALTER COLUMN tanggal_pelantikan DROP NOT NULL,
-  ALTER COLUMN jadwal_kgb_berikutnya DROP NOT NULL;
+  ALTER COLUMN jadwal_kgb_berikutnya DROP NOT NULL,
+  DROP COLUMN IF EXISTS gaji_pokok_terakhir,
+  DROP COLUMN IF EXISTS pangkat_terakhir;
 ALTER TABLE public.pengajuan_kgb
-  ADD COLUMN IF NOT EXISTS dokumen_sk_kgb_diterbitkan JSONB;
-ALTER TABLE public.pengajuan_kgb DROP CONSTRAINT IF EXISTS pengajuan_kgb_status_check;
+  ADD COLUMN IF NOT EXISTS dokumen_sk_kgb_diterbitkan JSONB,
+  DROP COLUMN IF EXISTS gaji_lama,
+  DROP COLUMN IF EXISTS gaji_baru_estimasi,
+  DROP COLUMN IF EXISTS dokumen_pendukung_lain;
 ALTER TABLE public.pengajuan_kgb ADD CONSTRAINT pengajuan_kgb_status_check 
   CHECK (status IN ('menunggu_verifikasi', 'dalam_proses', 'dikirim_ke_provinsi', 'perlu_perbaikan', 'disetujui', 'ditolak'));
 ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_role_check;
@@ -356,13 +376,13 @@ ALTER TABLE public.users ADD CONSTRAINT users_role_check
 INSERT INTO public.pegawai (
   id, nama, tempat_lahir, tanggal_lahir, jabatan, nip, jenis_kelamin, bagian_divisi,
   no_hp, alamat_kantor, alamat_rumah, email, agama, tanggal_pelantikan,
-  jadwal_kgb_berikutnya, gaji_pokok_terakhir, golongan_pangkat, pangkat_terakhir
+  jadwal_kgb_berikutnya, golongan_pangkat
 ) VALUES
-  ('peg-001', 'Dimas Ebo Kurniawan, S.IP', 'Subang', '1992-06-14', 'Analis Kepegawaian Pertama', '199206142019031004', 'Laki-laki', 'Sekretariat / Sub Bagian Administrasi', '081223456789', 'Jl. Veteran No. 12, Dangdeur, Kec. Subang, Kabupaten Subang, Jawa Barat 41211', 'Perumahan Griya Pasirkareumbi Blok B4 No. 12, Subang', 'dimas.ebo012@gmail.com', 'Islam', '2020-03-01', '2026-10-20', 3820000, 'Penata Muda / III/a', 'Penata Muda Tk. I'),
-  ('peg-002', 'Siti Rahmawati, S.H.', 'Bandung', '1990-11-28', 'Penyusun Bahan Bantuan Hukum', '199011282018012003', 'Perempuan', 'Divisi Hukum dan Penyelesaian Sengketa', '085311223344', 'Jl. Veteran No. 12, Dangdeur, Kec. Subang, Kabupaten Subang, Jawa Barat 41211', 'Jl. Ahmad Yani No. 45, Karanganyar, Subang', 'siti.rahmawati@bawaslu-subang.go.id', 'Islam', '2019-01-15', '2026-10-28', 4150000, 'Penata / III/c', 'Penata'),
-  ('peg-003', 'Ahmad Fauzi, S.Kom', 'Subang', '1994-03-05', 'Pranata Komputer Pelaksana', '199403052021021002', 'Laki-laki', 'Divisi Penanganan Pelanggaran dan Datin', '087822998811', 'Jl. Veteran No. 12, Dangdeur, Kec. Subang, Kabupaten Subang, Jawa Barat 41211', 'Jl. Otista No. 89, Sukamelang, Subang', 'ahmad.fauzi@bawaslu-subang.go.id', 'Islam', '2021-04-01', '2026-11-02', 3200000, 'Pengatur / II/c', 'Pengatur'),
-  ('peg-004', 'Rian Kurniawan, S.AP', 'Purwakarta', '1988-08-17', 'Pengelola Pengawasan Pemilu', '198808172017041001', 'Laki-laki', 'Divisi Pencegahan, Partisipasi Masyarakat, dan Hubungan Masyarakat', '081399887766', 'Jl. Veteran No. 12, Dangdeur, Kec. Subang, Kabupaten Subang, Jawa Barat 41211', 'Komplek Ciheuleut Permai No. 15, Subang', 'rian.kurniawan@bawaslu-subang.go.id', 'Islam', '2017-05-02', '2027-02-15', 4450000, 'Penata Tingkat I / III/d', 'Penata Tk. I'),
-  ('peg-005', 'Dewi Lestari, S.E.', 'Majalengka', '1995-12-09', 'Bendahara Pengeluaran Pembantu', '199512092022032005', 'Perempuan', 'Divisi Sumber Daya Manusia, Organisasi, dan Diklat', '082155667788', 'Jl. Veteran No. 12, Dangdeur, Kec. Subang, Kabupaten Subang, Jawa Barat 41211', 'Jl. Mayjen Sutoyo No. 34, Subang', 'dewi.lestari@bawaslu-subang.go.id', 'Islam', '2022-04-01', '2027-04-01', 3100000, 'Penata Muda / III/a', 'Penata Muda')
+  ('peg-001', 'Dimas Ebo Kurniawan, S.IP', 'Subang', '1992-06-14', 'Analis Kepegawaian Pertama', '199206142019031004', 'Laki-laki', 'Sekretariat / Sub Bagian Administrasi', '081223456789', 'Jl. Veteran No. 12, Dangdeur, Kec. Subang, Kabupaten Subang, Jawa Barat 41211', 'Perumahan Griya Pasirkareumbi Blok B4 No. 12, Subang', 'dimas.ebo012@gmail.com', 'Islam', '2020-03-01', '2026-10-20', 'Penata Muda / III/a'),
+  ('peg-002', 'Siti Rahmawati, S.H.', 'Bandung', '1990-11-28', 'Penyusun Bahan Bantuan Hukum', '199011282018012003', 'Perempuan', 'Divisi Hukum dan Penyelesaian Sengketa', '085311223344', 'Jl. Veteran No. 12, Dangdeur, Kec. Subang, Kabupaten Subang, Jawa Barat 41211', 'Jl. Ahmad Yani No. 45, Karanganyar, Subang', 'siti.rahmawati@bawaslu-subang.go.id', 'Islam', '2019-01-15', '2026-10-28', 'Penata / III/c'),
+  ('peg-003', 'Ahmad Fauzi, S.Kom', 'Subang', '1994-03-05', 'Pranata Komputer Pelaksana', '199403052021021002', 'Laki-laki', 'Divisi Penanganan Pelanggaran dan Datin', '087822998811', 'Jl. Veteran No. 12, Dangdeur, Kec. Subang, Kabupaten Subang, Jawa Barat 41211', 'Jl. Otista No. 89, Sukamelang, Subang', 'ahmad.fauzi@bawaslu-subang.go.id', 'Islam', '2021-04-01', '2026-11-02', 'Pengatur / II/c'),
+  ('peg-004', 'Rian Kurniawan, S.AP', 'Purwakarta', '1988-08-17', 'Pengelola Pengawasan Pemilu', '198808172017041001', 'Laki-laki', 'Divisi Pencegahan, Partisipasi Masyarakat, dan Hubungan Masyarakat', '081399887766', 'Jl. Veteran No. 12, Dangdeur, Kec. Subang, Kabupaten Subang, Jawa Barat 41211', 'Komplek Ciheuleut Permai No. 15, Subang', 'rian.kurniawan@bawaslu-subang.go.id', 'Islam', '2017-05-02', '2027-02-15', 'Penata Tingkat I / III/d'),
+  ('peg-005', 'Dewi Lestari, S.E.', 'Majalengka', '1995-12-09', 'Bendahara Pengeluaran Pembantu', '199512092022032005', 'Perempuan', 'Divisi Sumber Daya Manusia, Organisasi, dan Diklat', '082155667788', 'Jl. Veteran No. 12, Dangdeur, Kec. Subang, Kabupaten Subang, Jawa Barat 41211', 'Jl. Mayjen Sutoyo No. 34, Subang', 'dewi.lestari@bawaslu-subang.go.id', 'Islam', '2022-04-01', '2027-04-01', 'Penata Muda / III/a')
 ON CONFLICT (id) DO UPDATE SET
   nama = EXCLUDED.nama,
   nip = EXCLUDED.nip,

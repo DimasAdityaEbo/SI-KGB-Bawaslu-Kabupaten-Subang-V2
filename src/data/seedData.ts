@@ -17,9 +17,7 @@ export const INITIAL_PEGAWAI: Pegawai[] = [
     agama: 'Islam',
     tanggalPelantikan: '2020-03-01',
     jadwalKgbBerikutnya: '2026-10-20', // Terdekat < 1 bulan! (Today is 2026-10-04)
-    gajiPokokTerakhir: 3820000,
     golonganPangkat: 'Penata Muda / III/a',
-    pangkatTerakhir: 'Penata Muda Tk. I',
     createdAt: '2024-01-10T08:00:00Z',
   },
   {
@@ -38,9 +36,7 @@ export const INITIAL_PEGAWAI: Pegawai[] = [
     agama: 'Islam',
     tanggalPelantikan: '2019-01-15',
     jadwalKgbBerikutnya: '2026-10-28', // Terdekat < 1 bulan!
-    gajiPokokTerakhir: 4150000,
     golonganPangkat: 'Penata / III/c',
-    pangkatTerakhir: 'Penata',
     createdAt: '2024-01-10T08:00:00Z',
   },
   {
@@ -59,9 +55,7 @@ export const INITIAL_PEGAWAI: Pegawai[] = [
     agama: 'Islam',
     tanggalPelantikan: '2021-04-01',
     jadwalKgbBerikutnya: '2026-11-02', // Terdekat < 1 bulan (kurang dari 30 hari)
-    gajiPokokTerakhir: 3200000,
     golonganPangkat: 'Pengatur / II/c',
-    pangkatTerakhir: 'Pengatur',
     createdAt: '2024-01-10T08:00:00Z',
   },
   {
@@ -80,9 +74,7 @@ export const INITIAL_PEGAWAI: Pegawai[] = [
     agama: 'Islam',
     tanggalPelantikan: '2017-05-02',
     jadwalKgbBerikutnya: '2027-02-15', // Masih lama (> 1 bulan)
-    gajiPokokTerakhir: 4450000,
     golonganPangkat: 'Penata Tingkat I / III/d',
-    pangkatTerakhir: 'Penata Tk. I',
     createdAt: '2024-01-10T08:00:00Z',
   },
   {
@@ -101,9 +93,7 @@ export const INITIAL_PEGAWAI: Pegawai[] = [
     agama: 'Islam',
     tanggalPelantikan: '2022-04-01',
     jadwalKgbBerikutnya: '2027-04-01',
-    gajiPokokTerakhir: 3100000,
     golonganPangkat: 'Penata Muda / III/a',
-    pangkatTerakhir: 'Penata Muda',
     createdAt: '2024-01-10T08:00:00Z',
   }
 ];
@@ -204,8 +194,6 @@ export const INITIAL_PENGAJUAN: PengajuanKGB[] = [
     perihal: 'Permohonan Kenaikan Gaji Berkala (KGB) Periode Oktober 2026',
     periodeKgb: 'Oktober 2026',
     tmtKgbBaru: '2026-10-01',
-    gajiLama: 3820000,
-    gajiBaruEstimasi: 3980000,
     skPangkatTerakhir: {
       id: 'doc-001',
       namaFile: 'SK_Pangkat_Terakhir_Dimas_Ebo.pdf',
@@ -247,8 +235,6 @@ export const INITIAL_PENGAJUAN: PengajuanKGB[] = [
     perihal: 'Pengajuan Kenaikan Gaji Berkala (KGB) TMT Oktober 2026',
     periodeKgb: 'Oktober 2026',
     tmtKgbBaru: '2026-10-01',
-    gajiLama: 4150000,
-    gajiBaruEstimasi: 4320000,
     skPangkatTerakhir: {
       id: 'doc-004',
       namaFile: 'SK_Kenaikan_Pangkat_Siti_Rahmawati.pdf',
@@ -286,8 +272,6 @@ export const INITIAL_PENGAJUAN: PengajuanKGB[] = [
     perihal: 'Pengajuan KGB Periode November 2026',
     periodeKgb: 'November 2026',
     tmtKgbBaru: '2026-11-01',
-    gajiLama: 3200000,
-    gajiBaruEstimasi: 3350000,
     skPangkatTerakhir: {
       id: 'doc-006',
       namaFile: 'SK_Pangkat_Ahmad_Fauzi.pdf',
@@ -324,8 +308,6 @@ export const INITIAL_PENGAJUAN: PengajuanKGB[] = [
     perihal: 'Pengajuan KGB Periode Mei 2026',
     periodeKgb: 'Mei 2026',
     tmtKgbBaru: '2026-05-01',
-    gajiLama: 4450000,
-    gajiBaruEstimasi: 4620000,
     skPangkatTerakhir: {
       id: 'doc-008',
       namaFile: 'SK_Pangkat_Rian_Kurniawan.pdf',
@@ -486,8 +468,6 @@ NIP / NIK : {NIP}
 Pangkat / Golongan : {PANGKAT_GOLONGAN}
 Jabatan : {JABATAN}
 Unit Kerja : {UNIT_KERJA}
-Gaji Pokok Lama : {GAJI_POKOK_LAMA}
-Usulan Gaji Pokok Baru : {GAJI_POKOK_BARU}
 Terhitung Mulai Tanggal (TMT) : {TMT_KGB_FORMAT}
 
 Sebagai bahan pertimbangan dan kelengkapan administrasi pemrosesan lebih lanjut di Bawaslu Provinsi Jawa Barat, bersama ini kami lampirkan berkas-berkas pendukung antara lain:
@@ -526,9 +506,6 @@ Jabatan : {JABATAN}
 Unit Kerja : {UNIT_KERJA}
 Tanggal Terima : {TANGGAL_SURAT}
 Terhitung Mulai Tanggal (TMT) : {TMT_KGB_FORMAT}
-Gaji Pokok Terakhir : {GAJI_POKOK_LAMA}
-Estimasi Gaji Baru : {GAJI_POKOK_BARU}
-
 Kelengkapan Berkas Terlampir:
 [✓] Salinan SK Kenaikan Pangkat Terakhir
 [✓] Salinan SK Kenaikan Gaji Berkala Terakhir

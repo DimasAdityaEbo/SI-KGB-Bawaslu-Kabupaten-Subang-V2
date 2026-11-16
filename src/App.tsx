@@ -39,6 +39,7 @@ import { KopSuratModal } from './components/admin/KopSuratModal';
 import { SystemAdminDashboard } from './components/admin/SystemAdminDashboard';
 import { LogEmailView } from './components/admin/LogEmailView';
 import { PengaturanKopSuratView } from './components/admin/PengaturanKopSuratView';
+import Swal from 'sweetalert2';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(getCurrentSessionUser);
@@ -124,7 +125,19 @@ export default function App() {
     setSelectedPengajuan(null);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'Konfirmasi keluar',
+      text: 'Apakah Anda yakin ingin keluar dari aplikasi?',
+      showCancelButton: true,
+      confirmButtonText: 'Ya, keluar',
+      cancelButtonText: 'Batal',
+      reverseButtons: true,
+    });
+
+    if (!result.isConfirmed) return;
+
     setCurrentUser(null);
     localStorage.removeItem('sikgb_session_user');
   };

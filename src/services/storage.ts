@@ -70,6 +70,34 @@ const KEYS = {
   TANDA_TANGAN_CAP: 'sikgb_ttd_cap_v1',
 };
 
+type LegacyPegawai = Pegawai & { gajiPokokTerakhir?: number; pangkatTerakhir?: string };
+type LegacyPengajuan = PengajuanKGB & { dokumenPendukungLain?: unknown };
+
+function getLocalPegawaiList(): Pegawai[] {
+  const raw = localStorage.getItem(KEYS.PEGAWAI);
+  const pegawaiList: LegacyPegawai[] = raw ? JSON.parse(raw) : INITIAL_PEGAWAI;
+  const normalized = pegawaiList.map((pegawai) => {
+    const currentPegawai = { ...pegawai };
+    delete currentPegawai.gajiPokokTerakhir;
+    delete currentPegawai.pangkatTerakhir;
+    return currentPegawai;
+  });
+  localStorage.setItem(KEYS.PEGAWAI, JSON.stringify(normalized));
+  return normalized;
+}
+
+function getLocalPengajuanList(): PengajuanKGB[] {
+  const raw = localStorage.getItem(KEYS.PENGAJUAN);
+  const pengajuanList: LegacyPengajuan[] = raw ? JSON.parse(raw) : INITIAL_PENGAJUAN;
+  const normalized = pengajuanList.map((pengajuan) => {
+    const currentPengajuan = { ...pengajuan };
+    delete currentPengajuan.dokumenPendukungLain;
+    return currentPengajuan;
+  });
+  safeLocalStorageSet(KEYS.PENGAJUAN, normalized);
+  return normalized;
+}
+
 // Initialize localStorage with seed data if empty
 function initializeLocalStorage(): void {
   if (!localStorage.getItem(KEYS.PEGAWAI)) {
@@ -107,9 +135,9 @@ export function getLocalDataSnapshot(): {
   };
 
   return {
-    pegawai: readList(KEYS.PEGAWAI, INITIAL_PEGAWAI),
+    pegawai: getLocalPegawaiList(),
     users: readList(KEYS.USERS, INITIAL_USERS),
-    pengajuan: readList(KEYS.PENGAJUAN, INITIAL_PENGAJUAN),
+    pengajuan: getLocalPengajuanList(),
     notifications: readList(KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS),
     emailLogs: readList(KEYS.EMAIL_LOGS, INITIAL_EMAIL_LOGS),
   };
@@ -139,9 +167,7 @@ export async function getPegawaiList(): Promise<Pegawai[]> {
           agama: d.agama,
           tanggalPelantikan: d.tanggal_pelantikan || d.tanggalPelantikan || '',
           jadwalKgbBerikutnya: d.jadwal_kgb_berikutnya || d.jadwalKgbBerikutnya || '',
-          gajiPokokTerakhir: d.gaji_pokok_terakhir ?? d.gajiPokokTerakhir,
           golonganPangkat: d.golongan_pangkat || d.golonganPangkat,
-          pangkatTerakhir: d.pangkat_terakhir || d.pangkatTerakhir,
           createdAt: d.created_at || d.createdAt || new Date().toISOString(),
         }));
       }
@@ -153,8 +179,7 @@ export async function getPegawaiList(): Promise<Pegawai[]> {
 
   // Local fallback
   try {
-    const raw = localStorage.getItem(KEYS.PEGAWAI);
-    return raw ? JSON.parse(raw) : INITIAL_PEGAWAI;
+    return getLocalPegawaiList();
   } catch (e) {
     return INITIAL_PEGAWAI;
   }
@@ -180,9 +205,7 @@ export async function savePegawai(pegawai: Pegawai): Promise<Pegawai> {
         agama: pegawai.agama,
         tanggal_pelantikan: pegawai.tanggalPelantikan || null,
         jadwal_kgb_berikutnya: pegawai.jadwalKgbBerikutnya || null,
-        gaji_pokok_terakhir: pegawai.gajiPokokTerakhir,
         golongan_pangkat: pegawai.golonganPangkat,
-        pangkat_terakhir: pegawai.pangkatTerakhir,
       };
       const { error } = await supabase.from('pegawai').upsert(dbPayload);
       if (error) throw new Error(error.message);
@@ -237,30 +260,7 @@ export async function getPengajuanList(): Promise<PengajuanKGB[]> {
       if (error) throw new Error(error.message);
       if (data) {
         return data.map((d) => {
-          let resolvedStatus = (d.status || 'menunggu_verifikasi') as PengajuanStatus;
-
-          // Check if fallback sub_status is preserved in dokumen_pendukung_lain
-          if (
-            (resolvedStatus === 'dalam_proses' || resolvedStatus === 'menunggu_verifikasi') &&
-            d.dokumen_pendukung_lain &&
-            (d.dokumen_pendukung_lain._sub_status === 'dikirim_ke_provinsi' ||
-              d.dokumen_pendukung_lain._actualStatus === 'dikirim_ke_provinsi')
-          ) {
-            resolvedStatus = 'dikirim_ke_provinsi';
-          }
-
-          let cleanDokumenPendukung = d.dokumen_pendukung_lain || d.dokumenPendukungLain;
-          if (cleanDokumenPendukung) {
-            if (
-              !cleanDokumenPendukung.id &&
-              (cleanDokumenPendukung._sub_status || cleanDokumenPendukung._actualStatus)
-            ) {
-              cleanDokumenPendukung = undefined;
-            } else if (cleanDokumenPendukung._sub_status || cleanDokumenPendukung._actualStatus) {
-              const { _sub_status, _actualStatus, ...restDoc } = cleanDokumenPendukung;
-              cleanDokumenPendukung = restDoc;
-            }
-          }
+          const resolvedStatus = (d.status || 'menunggu_verifikasi') as PengajuanStatus;
 
           return {
             id: d.id,
@@ -275,12 +275,9 @@ export async function getPengajuanList(): Promise<PengajuanKGB[]> {
             perihal: d.perihal,
             periodeKgb: d.periode_kgb || d.periodeKgb,
             tmtKgbBaru: d.tmt_kgb_baru || d.tmtKgbBaru,
-            gajiLama: d.gaji_lama ?? d.gajiLama,
-            gajiBaruEstimasi: d.gaji_baru_estimasi ?? d.gajiBaruEstimasi,
             skPangkatTerakhir: d.sk_pangkat_terakhir || d.skPangkatTerakhir,
             skGajiBerkalaTerakhir: d.sk_gaji_berkala_terakhir || d.skGajiBerkalaTerakhir,
             dokumenSkpPrestasi: d.dokumen_skp_prestasi || d.dokumenSkpPrestasi,
-            dokumenPendukungLain: cleanDokumenPendukung,
             catatanPemohon: d.catatan_pemohon || d.catatanPemohon,
             status: resolvedStatus,
             catatanVerifikator: d.catatan_verifikator || d.catatanVerifikator,
@@ -300,8 +297,7 @@ export async function getPengajuanList(): Promise<PengajuanKGB[]> {
   }
 
   try {
-    const raw = localStorage.getItem(KEYS.PENGAJUAN);
-    return raw ? JSON.parse(raw) : INITIAL_PENGAJUAN;
+    return getLocalPengajuanList();
   } catch (e) {
     return INITIAL_PENGAJUAN;
   }
@@ -344,8 +340,6 @@ export async function savePengajuan(item: PengajuanKGB): Promise<PengajuanKGB> {
         perihal: item.perihal,
         periode_kgb: item.periodeKgb,
         tmt_kgb_baru: item.tmtKgbBaru,
-        gaji_lama: item.gajiLama ?? null,
-        gaji_baru_estimasi: item.gajiBaruEstimasi ?? null,
         // Trim fileData for supabase payload
         sk_pangkat_terakhir: item.skPangkatTerakhir
           ? { ...item.skPangkatTerakhir, fileData: undefined }
@@ -355,9 +349,6 @@ export async function savePengajuan(item: PengajuanKGB): Promise<PengajuanKGB> {
           : null,
         dokumen_skp_prestasi: item.dokumenSkpPrestasi
           ? { ...item.dokumenSkpPrestasi, fileData: undefined }
-          : null,
-        dokumen_pendukung_lain: item.dokumenPendukungLain
-          ? { ...item.dokumenPendukungLain, fileData: undefined }
           : null,
         catatan_pemohon: item.catatanPemohon ?? null,
         status: item.status,
@@ -377,37 +368,16 @@ export async function savePengajuan(item: PengajuanKGB): Promise<PengajuanKGB> {
 
       const { error } = await supabase.from('pengajuan_kgb').upsert(dbPayload);
       if (error) {
-        console.warn('Supabase save pengajuan first attempt warning:', error);
-        // If Postgres rejected because check constraint pengajuan_kgb_status_check doesn't have dikirim_ke_provinsi yet
         if (
           error.code === '23514' ||
           error.message?.includes('status_check') ||
           error.message?.includes('violates check constraint')
         ) {
-          console.info('Handling status check constraint fallback for Supabase table...');
-          const fallbackPayload = {
-            ...dbPayload,
-            status: 'dalam_proses',
-            dokumen_pendukung_lain: {
-              ...(item.dokumenPendukungLain
-                ? { ...item.dokumenPendukungLain, fileData: undefined }
-                : {}),
-              _sub_status: item.status,
-            },
-          };
-          const { error: fallbackError } = await supabase
-            .from('pengajuan_kgb')
-            .upsert(fallbackPayload);
-          if (fallbackError) {
-            throw new Error(
-              `Supabase fallback save failed (${fallbackError.code}): ${fallbackError.message}`
-            );
-          } else {
-            console.info('Supabase fallback saved successfully with _sub_status:', item.status);
-          }
-        } else {
-          throw new Error(`${error.code}: ${error.message}`);
+          throw new Error(
+            `${error.code}: ${error.message}. Jalankan SQL migrasi Supabase agar constraint status pengajuan sesuai dengan aplikasi.`
+          );
         }
+        throw new Error(`${error.code}: ${error.message}`);
       }
     } catch (e) {
       console.warn('Supabase save pengajuan error:', e);
@@ -416,8 +386,7 @@ export async function savePengajuan(item: PengajuanKGB): Promise<PengajuanKGB> {
   }
 
   try {
-    const raw = localStorage.getItem(KEYS.PENGAJUAN);
-    const localList: PengajuanKGB[] = raw ? JSON.parse(raw) : INITIAL_PENGAJUAN;
+    const localList = getLocalPengajuanList();
     const index = localList.findIndex((p) => p.id === item.id);
     const updated = [...localList];
     if (index >= 0) {
@@ -436,8 +405,7 @@ export async function savePengajuan(item: PengajuanKGB): Promise<PengajuanKGB> {
 export async function deletePengajuan(id: string): Promise<boolean> {
   // 1. Delete from localStorage
   try {
-    const raw = localStorage.getItem(KEYS.PENGAJUAN);
-    const localList: PengajuanKGB[] = raw ? JSON.parse(raw) : INITIAL_PENGAJUAN;
+    const localList = getLocalPengajuanList();
     const updated = localList.filter((p) => p.id !== id);
     safeLocalStorageSet(KEYS.PENGAJUAN, updated);
   } catch (e) {

@@ -28,6 +28,7 @@ import { sendKgbStatusEmail } from '../../services/emailService';
 import { PrintDocumentModal } from '../PrintDocumentModal';
 import { DocumentViewerModal } from '../DocumentViewerModal';
 import { readFileAsDataUrl, downloadDokumenFile } from '../../services/documentUtils';
+import { showErrorDialog, showSuccessDialog, showWarningDialog } from '../../services/alerts';
 
 interface AjukanPermohonanProps {
   pegawai: Pegawai;
@@ -86,7 +87,6 @@ export const AjukanPermohonan: React.FC<AjukanPermohonanProps> = ({
   const [fileSkpPrestasi, setFileSkpPrestasi] = useState<File | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [notificationWarning, setNotificationWarning] = useState<string | null>(null);
   const [submittedPengajuan, setSubmittedPengajuan] = useState<PengajuanKGB | null>(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
@@ -111,7 +111,6 @@ export const AjukanPermohonan: React.FC<AjukanPermohonanProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setSubmissionError(null);
     setNotificationWarning(null);
     try {
       // Re-check against the latest database state to prevent duplicate submissions.
@@ -121,18 +120,18 @@ export const AjukanPermohonan: React.FC<AjukanPermohonanProps> = ({
       );
       if (freshOngoing) {
         setInternalList(freshList);
-        alert(
+        void showWarningDialog(
           `Permohonan tidak dapat dikirim.\n\nAnda masih memiliki pengajuan KGB yang sedang dalam proses verifikasi (No. Registrasi: ${freshOngoing.noPengajuan}).\n\nPegawai hanya dapat mengajukan KGB baru setelah pengajuan sebelumnya telah Disetujui atau Ditolak.`
         );
         return;
       }
 
       if (!fileSkPangkat) {
-        alert('Harap unggah SK Kenaikan Pangkat terakhir Anda.');
+        void showWarningDialog('Harap unggah SK Kenaikan Pangkat terakhir Anda.');
         return;
       }
       if (!fileSkpPrestasi) {
-        alert('Harap unggah Dokumen Penilaian Prestasi Kerja (SKP) terakhir Anda.');
+        void showWarningDialog('Harap unggah Dokumen Penilaian Prestasi Kerja (SKP) terakhir Anda.');
         return;
       }
 
@@ -193,8 +192,6 @@ export const AjukanPermohonan: React.FC<AjukanPermohonanProps> = ({
         perihal: perihal.trim(),
         periodeKgb: periodeKgb.trim(),
         tmtKgbBaru: tmtKgbBaru,
-        gajiLama: pegawai.gajiPokokTerakhir || 3820000,
-        gajiBaruEstimasi: (pegawai.gajiPokokTerakhir || 3820000) + 160000,
         skPangkatTerakhir: skPangkatDoc,
         skGajiBerkalaTerakhir: skKgbDoc,
         dokumenSkpPrestasi: skpDoc,
@@ -209,6 +206,7 @@ export const AjukanPermohonan: React.FC<AjukanPermohonanProps> = ({
       setSubmittedPengajuan(newPengajuan);
       setActivePrintTarget(newPengajuan);
       onRefreshData();
+      void showSuccessDialog('Permohonan KGB berhasil disimpan dan dikirim untuk diverifikasi.');
 
       // Notifications are follow-up actions and must not turn a saved submission
       // into a false failure from the employee's perspective.
@@ -226,13 +224,13 @@ export const AjukanPermohonan: React.FC<AjukanPermohonanProps> = ({
     } catch (err) {
       console.error(err);
       const message = err instanceof Error ? err.message : String(err);
-      setSubmissionError(
+      const errorMessage =
         message.includes('23503')
           ? 'Data pegawai belum tersedia pada database Supabase. Minta administrator menyinkronkan data pegawai terlebih dahulu.'
           : message.includes('42703') || message.includes('does not exist')
           ? `Skema tabel Supabase belum sesuai. Hubungi administrator untuk menjalankan SQL migrasi database. Detail: ${message}`
-          : `Permohonan gagal disimpan ke database: ${message}`
-      );
+          : `Permohonan gagal disimpan ke database: ${message}`;
+      void showErrorDialog(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -613,15 +611,6 @@ export const AjukanPermohonan: React.FC<AjukanPermohonanProps> = ({
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              {submissionError && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-red-900"
-                >
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-                  <p className="leading-relaxed">{submissionError}</p>
-                </div>
-              )}
               {/* Auto-filled Badge Header */}
               <div className="rounded-lg bg-sky-50 border border-sky-200 p-3 text-sky-900 leading-relaxed">
                 <span className="font-bold block text-sky-950">Data Otomatis Terhubung ke Database:</span>

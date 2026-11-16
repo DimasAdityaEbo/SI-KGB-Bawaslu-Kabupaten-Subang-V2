@@ -18,7 +18,6 @@ import {
   Layers,
   FileCode,
   Tag,
-  AlertTriangle,
 } from 'lucide-react';
 import {
   TemplateDokumen,
@@ -40,6 +39,7 @@ import { exportElementToPdf } from '../../services/pdfExport';
 import { KopSuratHeader } from '../KopSuratHeader';
 import { KopSuratModal } from './KopSuratModal';
 import { TandaTanganCapBlock } from '../TandaTanganCapBlock';
+import { confirmDeleteDialog, confirmDialog, showErrorDialog, showSuccessDialog, showWarningDialog } from '../../services/alerts';
 
 interface TemplateDokumenViewProps {
   pegawaiList: Pegawai[];
@@ -63,8 +63,6 @@ const VARIABLE_TAGS = [
   { tag: '{UNIT_KERJA}', label: 'Unit Kerja / Divisi' },
   { tag: '{TMT_KGB_BARU}', label: 'TMT KGB Baru' },
   { tag: '{TMT_KGB_FORMAT}', label: 'TMT KGB (Format Tanggal Indonesia)' },
-  { tag: '{GAJI_POKOK_LAMA}', label: 'Gaji Pokok Lama' },
-  { tag: '{GAJI_POKOK_BARU}', label: 'Gaji Pokok Baru' },
   { tag: '{NOMOR_SURAT}', label: 'Nomor Surat' },
   { tag: '{TANGGAL_SURAT}', label: 'Tanggal Surat (Format Indonesia)' },
   { tag: '{NAMA_PEJABAT}', label: 'Nama Penandatangan' },
@@ -105,12 +103,6 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
   const [formPejabatTtdUrl, setFormPejabatTtdUrl] = useState('');
   const [isReadingPejabatTtd, setIsReadingPejabatTtd] = useState(false);
   const [formTembusan, setFormTembusan] = useState<string>('');
-  const [feedbackToast, setFeedbackToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
-
-  // Delete Confirmation Modal state
-  const [deleteTarget, setDeleteTarget] = useState<TemplateDokumen | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
   // Preview Modal state
   const [previewTemplate, setPreviewTemplate] = useState<TemplateDokumen | null>(null);
   const [samplePegawaiId, setSamplePegawaiId] = useState<string>('');
@@ -128,7 +120,7 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
       });
     } catch (err) {
       console.error('Download PDF error:', err);
-      alert('Gagal mengunduh dokumen PDF.');
+      void showErrorDialog('Gagal mengunduh dokumen PDF.');
     } finally {
       setIsDownloading(false);
     }
@@ -140,10 +132,13 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
   const [ttdCapConfig] = useState<TandaTanganCapConfig>(getTandaTanganCapConfig());
 
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
-    setFeedbackToast({ message, type });
-    setTimeout(() => {
-      setFeedbackToast(null);
-    }, 4000);
+    if (type === 'error') {
+      void showErrorDialog(message);
+    } else if (type === 'info') {
+      void showWarningDialog(message);
+    } else {
+      void showSuccessDialog(message);
+    }
   };
 
   const loadTemplates = async () => {
@@ -215,51 +210,49 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
-
-    setIsDeleting(true);
+  const handleDeleteTemplate = async (target: TemplateDokumen) => {
+    if (!(await confirmDeleteDialog(`Yakin ingin menghapus template "${target.nama}" dari sistem?`))) return;
     try {
-      await deleteTemplate(deleteTarget.id);
+      await deleteTemplate(target.id);
       await loadTemplates();
-      showToast(`Template "${deleteTarget.nama}" berhasil dihapus.`);
+      showToast(`Template "${target.nama}" berhasil dihapus.`);
 
       // If we are also editing this template, close editor
-      if (editingTemplate && editingTemplate.id === deleteTarget.id) {
+      if (editingTemplate && editingTemplate.id === target.id) {
         setIsEditorOpen(false);
         setEditingTemplate(null);
       }
 
       // If previewing this template, close preview
-      if (previewTemplate && previewTemplate.id === deleteTarget.id) {
+      if (previewTemplate && previewTemplate.id === target.id) {
         setPreviewTemplate(null);
       }
     } catch (err) {
       console.error('Error deleting template:', err);
-      alert('Gagal menghapus template.');
-    } finally {
-      setIsDeleting(false);
-      setDeleteTarget(null);
+      await showErrorDialog(err instanceof Error ? err.message : 'Gagal menghapus template.');
     }
   };
 
   const handleResetDefaults = async () => {
-    if (confirm('Yakin ingin mereset daftar template ke template standar bawaan Bawaslu Subang? Semua template bawaan yang dihapus akan dipulihkan.')) {
-      try {
-        await resetTemplatesToDefault();
-        await loadTemplates();
-        showToast('Daftar template berhasil dikembalikan ke standar Bawaslu Subang.');
-      } catch (error) {
-        console.error('Error resetting templates:', error);
-        showToast(error instanceof Error ? error.message : 'Gagal mereset template.', 'error');
-      }
+    if (!(await confirmDialog(
+      'Semua template bawaan yang dihapus akan dipulihkan.',
+      'Reset daftar template?',
+      'Ya, reset'
+    ))) return;
+    try {
+      await resetTemplatesToDefault();
+      await loadTemplates();
+      showToast('Daftar template berhasil dikembalikan ke standar Bawaslu Subang.');
+    } catch (error) {
+      console.error('Error resetting templates:', error);
+      showToast(error instanceof Error ? error.message : 'Gagal mereset template.', 'error');
     }
   };
 
   const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNama.trim() || !formIsiKonten.trim()) {
-      alert('Nama Template dan Isi Konten wajib diisi!');
+      void showWarningDialog('Nama Template dan Isi Konten wajib diisi!');
       return;
     }
 
@@ -285,10 +278,15 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
     };
 
     try {
+      const isEditing = Boolean(editingTemplate);
       await saveTemplate(payload);
       await loadTemplates();
       setIsEditorOpen(false);
-      showToast(`Template "${payload.nama}" berhasil disimpan.`);
+      showToast(
+        isEditing
+          ? `Template "${payload.nama}" berhasil diperbarui.`
+          : `Template "${payload.nama}" berhasil disimpan.`
+      );
     } catch (error) {
       console.error('Error saving template:', error);
       showToast(error instanceof Error ? error.message : 'Gagal menyimpan template.', 'error');
@@ -322,12 +320,6 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
       };
     }
 
-    const gajiLama = p.gajiPokokTerakhir
-      ? p.gajiPokokTerakhir.toLocaleString('id-ID')
-      : '3.820.000';
-    const gajiBaru = p.gajiPokokTerakhir
-      ? (p.gajiPokokTerakhir + 160000).toLocaleString('id-ID')
-      : '3.980.000';
     const tmtKgb = p.jadwalKgbBerikutnya || now.toISOString().split('T')[0];
     const tmtKgbFormatted = new Date(`${tmtKgb}T00:00:00`).toLocaleDateString('id-ID', {
       day: 'numeric',
@@ -343,8 +335,8 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
     content = content.replace(/\{UNIT_KERJA\}/g, p.bagianDivisi || 'Sekretariat Bawaslu Kabupaten Subang');
     content = content.replace(/\{TMT_KGB_BARU\}/g, tmtKgb);
     content = content.replace(/\{TMT_KGB_FORMAT\}/g, tmtKgbFormatted);
-    content = content.replace(/\{GAJI_POKOK_LAMA\}/g, gajiLama);
-    content = content.replace(/\{GAJI_POKOK_BARU\}/g, gajiBaru);
+    content = content.replace(/\{GAJI_POKOK_LAMA\}/g, '');
+    content = content.replace(/\{GAJI_POKOK_BARU\}/g, '');
     content = content.replace(/\{NOMOR_SURAT\}/g, nomorSurat);
     content = content.replace(/\{TANGGAL_SURAT\}/g, dateFormatted);
     content = content.replace(/\{NAMA_PEJABAT\}/g, template.penandatanganNama);
@@ -381,14 +373,6 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Toast Notification */}
-      {feedbackToast && (
-        <div className="fixed top-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-3 shadow-xl border border-slate-700 animate-in fade-in slide-in-from-top-3 text-xs">
-          <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-          <span>{feedbackToast.message}</span>
-        </div>
-      )}
-
       {/* Top Header */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -438,7 +422,7 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
           <div className="text-[11px] leading-relaxed">
             <span className="font-bold text-sky-900">Mendukung Tag Variabel Dinamis Otomatis:</span>
             <p className="text-sky-800 mt-0.5">
-              Gunakan tanda kurung kurawal seperti <code className="bg-white px-1.5 py-0.5 rounded border border-sky-300 font-mono text-[10px]">&#123;NAMA_PEGAWAI&#125;</code>, <code className="bg-white px-1.5 py-0.5 rounded border border-sky-300 font-mono text-[10px]">&#123;NIP&#125;</code>, <code className="bg-white px-1.5 py-0.5 rounded border border-sky-300 font-mono text-[10px]">&#123;TMT_KGB_BARU&#125;</code>, dan <code className="bg-white px-1.5 py-0.5 rounded border border-sky-300 font-mono text-[10px]">&#123;GAJI_POKOK_BARU&#125;</code> di dalam isi naskah. Sistem akan mengisinya secara otomatis saat dokumen dicetak.
+              Gunakan tanda kurung kurawal seperti <code className="bg-white px-1.5 py-0.5 rounded border border-sky-300 font-mono text-[10px]">&#123;NAMA_PEGAWAI&#125;</code>, <code className="bg-white px-1.5 py-0.5 rounded border border-sky-300 font-mono text-[10px]">&#123;NIP&#125;</code>, dan <code className="bg-white px-1.5 py-0.5 rounded border border-sky-300 font-mono text-[10px]">&#123;TMT_KGB_BARU&#125;</code> di dalam isi naskah. Sistem akan mengisinya secara otomatis saat dokumen dicetak.
             </p>
           </div>
         </div>
@@ -562,7 +546,7 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
                     </button>
                     {/* HAPUS TEMPLATE - Tersedia untuk SEMUA template (Default maupun Kustom) */}
                     <button
-                      onClick={() => setDeleteTarget(item)}
+                      onClick={() => void handleDeleteTemplate(item)}
                       className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 transition"
                       title="Hapus Template Dokumen Ini"
                     >
@@ -829,7 +813,7 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
                   {editingTemplate && (
                     <button
                       type="button"
-                      onClick={() => setDeleteTarget(editingTemplate)}
+                      onClick={() => void handleDeleteTemplate(editingTemplate)}
                       className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2 font-semibold text-red-700 hover:bg-red-100 transition"
                       title="Hapus template ini secara permanen"
                     >
@@ -862,64 +846,6 @@ export const TemplateDokumenView: React.FC<TemplateDokumenViewProps> = ({
                 </div>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ================= MODAL KONFIRMASI HAPUS TEMPLATE ================= */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl text-xs space-y-4 animate-in fade-in zoom-in-95">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
-                <AlertTriangle className="h-5 w-5" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900">
-                  Hapus Template Dokumen?
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Apakah Anda yakin ingin menghapus template berikut dari sistem?
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-1.5">
-              <div className="font-bold text-slate-900 text-xs">{deleteTarget.nama}</div>
-              <div className="flex items-center gap-2">
-                <span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
-                  {KATEGORI_LABELS[deleteTarget.kategori]?.label || deleteTarget.kategori}
-                </span>
-                <span className="font-mono text-[10px] text-slate-500">
-                  {deleteTarget.formatNomor}
-                </span>
-              </div>
-              {deleteTarget.isDefault && (
-                <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-[11px] text-amber-800">
-                  <b>Catatan:</b> Ini adalah salah satu template bawaan standar. Jika dihapus, Anda tetap dapat memulihkannya kapan saja menggunakan tombol <b>Reset Standar</b> di toolbar atas.
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={() => setDeleteTarget(null)}
-                className="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50 transition"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleConfirmDelete}
-                className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700 transition shadow disabled:opacity-50"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Template'}</span>
-              </button>
-            </div>
           </div>
         </div>
       )}

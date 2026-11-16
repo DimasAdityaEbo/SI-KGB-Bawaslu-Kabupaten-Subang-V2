@@ -33,6 +33,7 @@ import {
 import { PrintDocumentModal } from '../PrintDocumentModal';
 import { DocumentViewerModal } from '../DocumentViewerModal';
 import { downloadDokumenFile, readFileAsDataUrl } from '../../services/documentUtils';
+import { confirmDeleteDialog, showErrorDialog, showSuccessDialog, showWarningDialog } from '../../services/alerts';
 
 interface DaftarPengajuanProps {
   pengajuanList: PengajuanKGB[];
@@ -66,7 +67,6 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
   const [fileSkDiterbitkan, setFileSkDiterbitkan] = useState<File | null>(null);
   const [existingSkDoc, setExistingSkDoc] = useState<DokumenLampiran | undefined>(undefined);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   // Email Success Modal State
   const [emailSuccessModal, setEmailSuccessModal] = useState<{
@@ -84,25 +84,23 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [printMode, setPrintMode] = useState<'surat_pengantar' | 'tanda_terima' | 'sk_kgb' | 'disposisi'>('surat_pengantar');
 
-  // Delete pengajuan state
-  const [deleteTarget, setDeleteTarget] = useState<PengajuanKGB | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const handleDeletePengajuan = async (target: PengajuanKGB) => {
+    if (!(await confirmDeleteDialog(
+      `Anda akan menghapus pengajuan ${target.noPengajuan} atas nama ${target.namaPemohon}. Tindakan ini permanen.`
+    ))) return;
 
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
     try {
-      await deletePengajuan(deleteTarget.id);
-      if (activePengajuan?.id === deleteTarget.id) {
+      await deletePengajuan(target.id);
+      if (activePengajuan?.id === target.id) {
         setActivePengajuan(null);
       }
-      setDeleteTarget(null);
       onRefreshData();
-    } catch (err: any) {
+      await showSuccessDialog(`Pengajuan ${target.noPengajuan} berhasil dihapus.`);
+    } catch (err) {
       console.error('Error deleting pengajuan:', err);
-      alert(`Gagal menghapus pengajuan: ${err?.message || 'Terjadi kesalahan sistem'}`);
-    } finally {
-      setIsDeleting(false);
+      await showErrorDialog(
+        `Gagal menghapus pengajuan: ${err instanceof Error ? err.message : 'Terjadi kesalahan sistem'}`
+      );
     }
   };
 
@@ -129,11 +127,12 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
     if (!activePengajuan) return;
 
     if (newStatus === 'perlu_perbaikan' && !catatanVerifikasi.trim()) {
-      alert('Harap isi catatan perbaikan dokumen untuk pemohon.');
+      void showWarningDialog('Harap isi catatan perbaikan dokumen untuk pemohon.');
       return;
     }
 
     setIsUpdating(true);
+    let pengajuanSaved = false;
     try {
       // Process uploaded SK document if approved
       let skKgbDoc: DokumenLampiran | undefined = existingSkDoc;
@@ -171,6 +170,7 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
 
       // 1. Save data pengajuan safely
       await savePengajuan(updated);
+      pengajuanSaved = true;
 
       // 2. Saat pengajuan disetujui, jadwalkan KGB berikutnya dua tahun setelah tanggal persetujuan.
       let nextKgbFormatted: string | undefined = undefined;
@@ -192,7 +192,6 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
             const updatedPegawai: Pegawai = {
               ...targetPegawai,
               jadwalKgbBerikutnya: nextKgbFormatted,
-              gajiPokokTerakhir: activePengajuan.gajiBaruEstimasi || targetPegawai.gajiPokokTerakhir,
               updatedAt: verificationDate.toISOString(),
             };
 
@@ -244,6 +243,7 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
 
       setActivePengajuan(updated);
       onRefreshData();
+      await showSuccessDialog('Verifikasi pengajuan berhasil disimpan.');
 
       // 5. Open Email Success Confirmation Dialog
       setEmailSuccessModal({
@@ -255,9 +255,14 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
         updatedPengajuan: updated,
         nextJadwalKgb: nextKgbFormatted,
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error saving verification:', err);
-      alert(`Gagal menyimpan verifikasi: ${err?.message || 'Terjadi kesalahan sistem'}`);
+      if (pengajuanSaved) onRefreshData();
+      await showErrorDialog(
+        `${pengajuanSaved ? 'Verifikasi tersimpan, tetapi proses lanjutan gagal' : 'Gagal menyimpan verifikasi'}: ${
+          err instanceof Error ? err.message : 'Terjadi kesalahan sistem'
+        }`
+      );
     } finally {
       setIsUpdating(false);
     }
@@ -333,13 +338,6 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
           </p>
         </div>
       </div>
-
-      {successToast && (
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-          <span>{successToast}</span>
-        </div>
-      )}
 
       {/* Filter and Search */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white p-3 rounded-xl border border-slate-200">
@@ -428,7 +426,7 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
                           <span>Detail &amp; Verifikasi</span>
                         </button>
                         <button
-                          onClick={() => setDeleteTarget(item)}
+                          onClick={() => void handleDeletePengajuan(item)}
                           className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 p-2 text-red-600 hover:bg-red-100 hover:border-red-300 transition"
                           title={`Hapus Berkas Pengajuan ${item.noPengajuan}`}
                         >
@@ -951,7 +949,7 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
               <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
                 <button
                   type="button"
-                  onClick={() => setDeleteTarget(activePengajuan)}
+                  onClick={() => void handleDeletePengajuan(activePengajuan)}
                   className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 transition shadow-2xs"
                   title="Hapus berkas permohonan pengajuan KGB ini"
                 >
@@ -1170,60 +1168,6 @@ export const DaftarPengajuan: React.FC<DaftarPengajuanProps> = ({
         </div>
       )}
 
-      {/* ================= MODAL KONFIRMASI HAPUS PENGAJUAN ================= */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl text-xs space-y-4 animate-in fade-in zoom-in-95">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
-                <AlertTriangle className="h-5 w-5" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900">
-                  Hapus Berkas Pengajuan KGB?
-                </h3>
-                <p className="text-slate-600 leading-relaxed text-[11px]">
-                  Anda akan menghapus berkas pengajuan <strong>{deleteTarget.noPengajuan}</strong> atas nama <strong>{deleteTarget.namaPemohon}</strong>. Tindakan ini permanen dan tidak dapat dibatalkan.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-1 text-[11px] text-slate-600">
-              <div className="flex justify-between">
-                <span>NIP Pemohon:</span>
-                <span className="font-mono font-semibold text-slate-800">{deleteTarget.nipPemohon}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Perihal:</span>
-                <span className="font-semibold text-slate-800">{deleteTarget.perihal}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Status Saat Ini:</span>
-                <span className="font-semibold text-slate-800">{deleteTarget.status}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50 transition"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleConfirmDelete}
-                className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700 transition shadow disabled:opacity-50"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Pengajuan'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

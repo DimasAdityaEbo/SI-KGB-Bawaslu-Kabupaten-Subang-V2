@@ -37,9 +37,7 @@ export interface Pegawai {
   agama: string;
   tanggalPelantikan: string;
   jadwalKgbBerikutnya: string; // YYYY-MM-DD
-  gajiPokokTerakhir?: number;
   golonganPangkat?: string;
-  pangkatTerakhir?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -47,7 +45,7 @@ export interface Pegawai {
 export interface DokumenLampiran {
   id: string;
   namaFile: string;
-  jenisDokumen: 'sk_pangkat' | 'sk_kgb' | 'skp_prestasi' | 'dokumen_pendukung';
+  jenisDokumen: 'sk_pangkat' | 'sk_kgb' | 'skp_prestasi';
   tipeFile: string;
   ukuranFile: string;
   fileData?: string; // Base64 or URL
@@ -67,12 +65,9 @@ export interface PengajuanKGB {
   perihal: string;
   periodeKgb: string;
   tmtKgbBaru: string;
-  gajiLama?: number;
-  gajiBaruEstimasi?: number;
   skPangkatTerakhir: DokumenLampiran;
   skGajiBerkalaTerakhir?: DokumenLampiran;
   dokumenSkpPrestasi: DokumenLampiran;
-  dokumenPendukungLain?: DokumenLampiran;
   catatanPemohon?: string;
   status: PengajuanStatus;
   catatanVerifikator?: string;

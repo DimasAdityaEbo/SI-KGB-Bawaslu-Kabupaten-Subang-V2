@@ -22,6 +22,7 @@ import {
 import { Pegawai, User } from '../../types';
 import { DIVISI_OPTIONS, AGAMA_OPTIONS, GOLONGAN_OPTIONS } from '../../data/seedData';
 import { savePegawai, deletePegawai, saveUser, getUsersList } from '../../services/storage';
+import { confirmDeleteDialog, showErrorDialog, showSuccessDialog, showWarningDialog } from '../../services/alerts';
 
 interface KelolaPegawaiProps {
   pegawaiList: Pegawai[];
@@ -92,9 +93,7 @@ export const KelolaPegawai: React.FC<KelolaPegawaiProps> = ({
     agama: 'Islam',
     tanggalPelantikan: '',
     jadwalKgbBerikutnya: '',
-    gajiPokokTerakhir: 0,
     golonganPangkat: GOLONGAN_OPTIONS[4],
-    pangkatTerakhir: 'Penata Muda',
   };
 
   const [formData, setFormData] = useState<Partial<Pegawai>>(initialForm);
@@ -126,21 +125,28 @@ export const KelolaPegawai: React.FC<KelolaPegawaiProps> = ({
   };
 
   const handleDelete = async (id: string, nama: string) => {
-    if (confirm(`Yakin ingin menghapus data pegawai "${nama}"?`)) {
-      await deletePegawai(id);
-      onRefreshData();
+    if (await confirmDeleteDialog(`Yakin ingin menghapus data pegawai "${nama}"?`)) {
+      try {
+        await deletePegawai(id);
+        onRefreshData();
+        await showSuccessDialog(`Data pegawai "${nama}" berhasil dihapus.`);
+      } catch (error) {
+        console.error('Gagal menghapus data pegawai:', error);
+        await showErrorDialog(error instanceof Error ? error.message : 'Data pegawai gagal dihapus.');
+      }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.nama?.trim() || !formData.nip?.trim()) {
-      alert('Nama Pegawai dan NIP wajib diisi oleh Admin!');
+      void showWarningDialog('Nama Pegawai dan NIP wajib diisi oleh Admin!');
       return;
     }
 
     setIsSaving(true);
     setSaveError(null);
+    let newAccountInfo: { nama: string; username: string; nip: string } | null = null;
     try {
       const isNew = !selectedPegawai;
       const currentUsers = await getUsersList();
@@ -168,9 +174,7 @@ export const KelolaPegawai: React.FC<KelolaPegawaiProps> = ({
         agama: formData.agama || 'Islam',
         tanggalPelantikan: formData.tanggalPelantikan || '',
         jadwalKgbBerikutnya: nextKgbValue,
-        gajiPokokTerakhir: Number(formData.gajiPokokTerakhir) || 0,
         golonganPangkat: formData.golonganPangkat || GOLONGAN_OPTIONS[4],
-        pangkatTerakhir: formData.pangkatTerakhir || 'Penata Muda',
         createdAt: selectedPegawai?.createdAt || new Date().toISOString(),
       };
 
@@ -196,11 +200,11 @@ export const KelolaPegawai: React.FC<KelolaPegawaiProps> = ({
 
         await saveUser(newUser);
 
-        setCreatedAccountInfo({
+        newAccountInfo = {
           nama: payload.nama,
           username,
           nip: payload.nip.trim(),
-        });
+        };
       } else {
         // When updating existing employee, synchronize linked User record
         const currentUsers = await getUsersList();
@@ -220,17 +224,22 @@ export const KelolaPegawai: React.FC<KelolaPegawaiProps> = ({
 
       setIsModalOpen(false);
       onRefreshData();
+      await showSuccessDialog(
+        isNew ? 'Data pegawai dan akun pengguna berhasil dibuat.' : 'Data pegawai berhasil diperbarui.'
+      );
+      if (newAccountInfo) setCreatedAccountInfo(newAccountInfo);
     } catch (err) {
       console.error(err);
       const message = err instanceof Error ? err.message : String(err);
       const requiresDateMigration =
         message.includes('null value in column "tanggal_lahir"') ||
         message.includes('null value in column "tanggal_pelantikan"');
-      setSaveError(
+      const errorMessage =
         requiresDateMigration
           ? 'Database Supabase masih mewajibkan tanggal lahir atau tanggal pelantikan. Jalankan migrasi di bawah satu kali agar kedua tanggal dapat dikosongkan.'
-          : `Data pegawai gagal disimpan: ${message}`
-      );
+          : `Data pegawai gagal disimpan: ${message}`;
+      setSaveError(errorMessage);
+      await showErrorDialog(errorMessage);
       setMigrationCopyMessage(null);
       onRefreshData();
     } finally {

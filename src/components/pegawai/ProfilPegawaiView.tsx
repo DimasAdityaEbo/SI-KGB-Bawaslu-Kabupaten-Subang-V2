@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   User,
   Save,
-  CheckCircle2,
-  AlertCircle,
   Building2,
   Calendar,
   Mail,
@@ -17,6 +15,7 @@ import {
 import { Pegawai, User as UserType } from '../../types';
 import { DIVISI_OPTIONS, AGAMA_OPTIONS, GOLONGAN_OPTIONS } from '../../data/seedData';
 import { savePegawai, saveUser, getUsersList } from '../../services/storage';
+import { showErrorDialog, showSuccessDialog } from '../../services/alerts';
 
 interface ProfilPegawaiViewProps {
   pegawai: Pegawai;
@@ -33,8 +32,6 @@ export const ProfilPegawaiView: React.FC<ProfilPegawaiViewProps> = ({
 }) => {
   const [formData, setFormData] = useState<Pegawai>({ ...pegawai });
   const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Sync state if prop changes
   useEffect(() => {
@@ -61,15 +58,12 @@ export const ProfilPegawaiView: React.FC<ProfilPegawaiViewProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    setSaveError(null);
-    setSaveSuccess(false);
 
     try {
       const updatedPegawai: Pegawai = {
         ...formData,
         nama: formData.nama.trim(),
         nip: formData.nip.trim(),
-        gajiPokokTerakhir: Number(formData.gajiPokokTerakhir) || 0,
         updatedAt: new Date().toISOString(),
       };
 
@@ -91,12 +85,11 @@ export const ProfilPegawaiView: React.FC<ProfilPegawaiViewProps> = ({
         await saveUser(updatedUser);
       }
 
-      setSaveSuccess(true);
       onRefreshData();
-      setTimeout(() => setSaveSuccess(false), 4500);
+      await showSuccessDialog('Data profil Anda berhasil disimpan dan diperbarui.');
     } catch (err: any) {
       console.error(err);
-      setSaveError(err?.message || 'Gagal menyimpan perubahan profil');
+      await showErrorDialog(err?.message || 'Gagal menyimpan perubahan profil.');
     } finally {
       setIsSaving(false);
     }
@@ -154,23 +147,6 @@ export const ProfilPegawaiView: React.FC<ProfilPegawaiViewProps> = ({
           </div>
         )}
 
-        {/* Success Alert */}
-        {saveSuccess && (
-          <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-900 flex items-center gap-2.5">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-            <p className="font-semibold">
-              Data profil Anda berhasil disimpan dan disinkronkan ke dalam sistem!
-            </p>
-          </div>
-        )}
-
-        {/* Error Alert */}
-        {saveError && (
-          <div className="mt-4 rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-900 flex items-center gap-2.5">
-            <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
-            <p className="font-semibold">{saveError}</p>
-          </div>
-        )}
       </div>
 
       {/* Main Profile Form */}
@@ -331,11 +307,9 @@ export const ProfilPegawaiView: React.FC<ProfilPegawaiViewProps> = ({
                 value={formData.golonganPangkat || GOLONGAN_OPTIONS[4]}
                 onChange={(e) => {
                   const val = e.target.value;
-                  const pangkatPart = val.split('/')[0].trim();
                   setFormData({
                     ...formData,
                     golonganPangkat: val,
-                    pangkatTerakhir: pangkatPart,
                   });
                 }}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
@@ -348,20 +322,6 @@ export const ProfilPegawaiView: React.FC<ProfilPegawaiViewProps> = ({
               </select>
             </div>
 
-            {/* Pangkat Terakhir */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-800 mb-1">
-                Sebutan Pangkat Terakhir
-              </label>
-              <input
-                type="text"
-                value={formData.pangkatTerakhir || ''}
-                onChange={(e) => setFormData({ ...formData, pangkatTerakhir: e.target.value })}
-                placeholder="Contoh: Penata Muda"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
-              />
-            </div>
-
             {/* Tanggal Pelantikan */}
             <div>
               <label className="block text-xs font-semibold text-slate-800 mb-1">
@@ -372,21 +332,6 @@ export const ProfilPegawaiView: React.FC<ProfilPegawaiViewProps> = ({
                 value={formData.tanggalPelantikan || ''}
                 onChange={(e) => setFormData({ ...formData, tanggalPelantikan: e.target.value })}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
-              />
-            </div>
-
-            {/* Gaji Pokok Terakhir */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-800 mb-1">
-                Gaji Pokok Terakhir Saat Ini (Rp)
-              </label>
-              <input
-                type="number"
-                min={0}
-                step={10000}
-                value={formData.gajiPokokTerakhir || 0}
-                onChange={(e) => setFormData({ ...formData, gajiPokokTerakhir: Number(e.target.value) })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
               />
             </div>
 

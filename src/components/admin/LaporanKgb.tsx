@@ -16,6 +16,7 @@ import { BawasluLogo } from '../BawasluLogo';
 import { KopSuratHeader } from '../KopSuratHeader';
 import { KopSuratModal } from './KopSuratModal';
 import { TandaTanganCapBlock } from '../TandaTanganCapBlock';
+import { showErrorDialog } from '../../services/alerts';
 
 interface LaporanKgbProps {
   pengajuanList: PengajuanKGB[];
@@ -58,7 +59,7 @@ export const LaporanKgb: React.FC<LaporanKgbProps> = ({ pengajuanList, pegawaiLi
       });
     } catch (err) {
       console.error('Download laporan PDF error:', err);
-      alert('Gagal mengunduh laporan PDF. Silakan coba kembali.');
+      void showErrorDialog('Gagal mengunduh laporan PDF. Silakan coba kembali.');
     } finally {
       setIsDownloading(false);
     }
