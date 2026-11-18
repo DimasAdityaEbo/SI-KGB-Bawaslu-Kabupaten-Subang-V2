@@ -30,8 +30,8 @@ import {
   createGmailComposeUrl,
   createMailtoUrl,
 } from '../../services/emailService';
-import { PrintDocumentModal } from '../PrintDocumentModal';
-import { DocumentViewerModal } from '../DocumentViewerModal';
+import { PrintDocumentModal } from '../../components/PrintDocumentModal';
+import { DocumentViewerModal } from '../../components/DocumentViewerModal';
 import { downloadDokumenFile, readFileAsDataUrl } from '../../services/documentUtils';
 import { confirmDeleteDialog, showErrorDialog, showSuccessDialog, showWarningDialog } from '../../services/alerts';
 

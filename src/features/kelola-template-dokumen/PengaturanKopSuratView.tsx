@@ -18,7 +18,7 @@ import {
   resetKopSuratConfig,
   DEFAULT_KOP_SURAT,
 } from '../../services/storage';
-import { KopSuratHeader } from '../KopSuratHeader';
+import { KopSuratHeader } from '../../components/KopSuratHeader';
 import { confirmDialog, showErrorDialog, showSuccessDialog, showWarningDialog } from '../../services/alerts';
 
 interface PengaturanKopSuratViewProps {

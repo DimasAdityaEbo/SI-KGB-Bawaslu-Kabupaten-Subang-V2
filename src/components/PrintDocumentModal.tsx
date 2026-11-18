@@ -27,7 +27,7 @@ import {
 } from '../services/storage';
 import { exportElementToPdf } from '../services/pdfExport';
 import { KopSuratHeader } from './KopSuratHeader';
-import { KopSuratModal } from './admin/KopSuratModal';
+import { KopSuratModal } from '../features/kelola-template-dokumen/KopSuratModal';
 import { TandaTanganCapBlock } from './TandaTanganCapBlock';
 import { showErrorDialog } from '../services/alerts';
 

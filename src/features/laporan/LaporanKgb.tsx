@@ -12,10 +12,10 @@ import { PengajuanKGB, Pegawai, KopSuratConfig, TandaTanganCapConfig } from '../
 import { DIVISI_OPTIONS } from '../../data/seedData';
 import { getKopSuratConfig, getTandaTanganCapConfig } from '../../services/storage';
 import { exportElementToPdf } from '../../services/pdfExport';
-import { BawasluLogo } from '../BawasluLogo';
-import { KopSuratHeader } from '../KopSuratHeader';
-import { KopSuratModal } from './KopSuratModal';
-import { TandaTanganCapBlock } from '../TandaTanganCapBlock';
+import { BawasluLogo } from '../../components/BawasluLogo';
+import { KopSuratHeader } from '../../components/KopSuratHeader';
+import { KopSuratModal } from '../kelola-template-dokumen/KopSuratModal';
+import { TandaTanganCapBlock } from '../../components/TandaTanganCapBlock';
 import { showErrorDialog } from '../../services/alerts';
 
 interface LaporanKgbProps {

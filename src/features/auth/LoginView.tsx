@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../../types';
 import { Lock, User as UserIcon, Eye, EyeOff, ArrowRight, Info, ShieldCheck } from 'lucide-react';
-import { BawasluLogo } from '../BawasluLogo';
+import { BawasluLogo } from '../../components/BawasluLogo';
 import Swal from 'sweetalert2';
 
 interface LoginViewProps {

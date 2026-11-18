@@ -9,8 +9,8 @@ import {
   Building,
   RefreshCw,
 } from 'lucide-react';
-import { EmailDispatchLog, PengajuanKGB } from '../types';
-import { generateKgbEmailHtml, sendKgbStatusEmail } from '../services/emailService';
+import { EmailDispatchLog, PengajuanKGB } from '../../types';
+import { generateKgbEmailHtml, sendKgbStatusEmail } from '../../services/emailService';
 
 interface EmailLogModalProps {
   isOpen: boolean;

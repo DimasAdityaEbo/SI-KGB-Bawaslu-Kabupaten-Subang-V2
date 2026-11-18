@@ -25,8 +25,8 @@ import {
 import { Pegawai, PengajuanKGB, DokumenLampiran, PengajuanStatus } from '../../types';
 import { savePengajuan, getPengajuanList } from '../../services/storage';
 import { sendKgbStatusEmail } from '../../services/emailService';
-import { PrintDocumentModal } from '../PrintDocumentModal';
-import { DocumentViewerModal } from '../DocumentViewerModal';
+import { PrintDocumentModal } from '../../components/PrintDocumentModal';
+import { DocumentViewerModal } from '../../components/DocumentViewerModal';
 import { readFileAsDataUrl, downloadDokumenFile } from '../../services/documentUtils';
 import { showErrorDialog, showSuccessDialog, showWarningDialog } from '../../services/alerts';
 

@@ -36,9 +36,9 @@ import {
   getTandaTanganCapConfig,
 } from '../../services/storage';
 import { exportElementToPdf } from '../../services/pdfExport';
-import { KopSuratHeader } from '../KopSuratHeader';
+import { KopSuratHeader } from '../../components/KopSuratHeader';
 import { KopSuratModal } from './KopSuratModal';
-import { TandaTanganCapBlock } from '../TandaTanganCapBlock';
+import { TandaTanganCapBlock } from '../../components/TandaTanganCapBlock';
 import { confirmDeleteDialog, confirmDialog, showErrorDialog, showSuccessDialog, showWarningDialog } from '../../services/alerts';
 
 interface TemplateDokumenViewProps {

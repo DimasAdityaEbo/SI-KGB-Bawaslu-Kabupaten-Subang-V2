@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Bell, Check, Info, AlertTriangle, CheckCircle, AlertOctagon } from 'lucide-react';
-import { NotificationItem } from '../types';
+import { NotificationItem } from '../../types';
 
 interface NotificationModalProps {
   isOpen: boolean;

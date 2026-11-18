@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { X, KeyRound, Lock, Eye, EyeOff, Check } from 'lucide-react';
-import { User } from '../types';
-import { saveUser } from '../services/storage';
-import { showErrorDialog, showSuccessDialog } from '../services/alerts';
+import { User } from '../../types';
+import { saveUser } from '../../services/storage';
+import { showErrorDialog, showSuccessDialog } from '../../services/alerts';
 
 interface UbahPasswordModalProps {
   isOpen: boolean;
