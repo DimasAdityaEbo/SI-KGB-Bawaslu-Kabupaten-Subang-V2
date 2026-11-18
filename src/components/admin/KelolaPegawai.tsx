@@ -507,7 +507,7 @@ export const KelolaPegawai: React.FC<KelolaPegawaiProps> = ({
                   <div>
                     <p className="font-bold">Ketentuan Pengisian Pegawai Baru:</p>
                     <p className="text-[11px] text-sky-800 mt-0.5 leading-relaxed">
-                      Admin <strong>hanya wajib mengisi Nama dan NIP</strong>. Semua data kepegawaian lainnya bersifat opsional dan dapat diisi/dilengkapi secara mandiri oleh pegawai saat login ke akunnya masing-masing.
+                      kasubag <strong>hanya wajib mengisi Nama dan NIP</strong>. Semua data kepegawaian lainnya bersifat opsional dan dapat diisi/dilengkapi secara mandiri oleh pegawai saat login ke akunnya masing-masing.
                     </p>
                   </div>
                 </div>
@@ -545,7 +545,7 @@ export const KelolaPegawai: React.FC<KelolaPegawaiProps> = ({
                 {/* Nama Pegawai */}
                 <div className="sm:col-span-2">
                   <label className="block font-semibold text-slate-800 mb-1">
-                    Nama Pegawai (Lengkap dengan Gelar) <span className="text-red-600 font-bold">* (Wajib diisi Admin)</span>
+                    Nama Pegawai (Lengkap dengan Gelar) <span className="text-red-600 font-bold">* (Wajib diisi)</span>
                   </label>
                   <input
                     type="text"
@@ -560,7 +560,7 @@ export const KelolaPegawai: React.FC<KelolaPegawaiProps> = ({
                 {/* NIP */}
                 <div>
                   <label className="block font-semibold text-slate-800 mb-1">
-                    NIP / NIK <span className="text-red-600 font-bold">* (Wajib diisi Admin - Password Awal)</span>
+                    NIP / NIK <span className="text-red-600 font-bold">* (Wajib diisi - Password Awal)</span>
                   </label>
                   <input
                     type="text"
