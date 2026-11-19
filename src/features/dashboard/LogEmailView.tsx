@@ -11,9 +11,13 @@ import {
   Filter,
   Check,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { EmailDispatchLog, PengajuanKGB } from '../../types';
 import { generateKgbEmailHtml, sendKgbStatusEmail } from '../../services/emailService';
+
+const PAGE_SIZE = 10;
 
 interface LogEmailViewProps {
   emailLogs: EmailDispatchLog[];
@@ -28,6 +32,7 @@ export const LogEmailView: React.FC<LogEmailViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'delivered' | 'sent' | 'failed'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedLog, setSelectedLog] = useState<EmailDispatchLog | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [isSendingTest, setIsSendingTest] = useState(false);
@@ -43,6 +48,14 @@ export const LogEmailView: React.FC<LogEmailViewProps> = ({
     const matchesStatus = statusFilter === 'all' || log.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+  const totalPages = Math.ceil(filteredLogs.length / PAGE_SIZE);
+  const visiblePage = Math.min(currentPage, Math.max(totalPages, 1));
+  const paginatedLogs = filteredLogs.slice(
+    (visiblePage - 1) * PAGE_SIZE,
+    visiblePage * PAGE_SIZE
+  );
+  const firstVisibleLog = filteredLogs.length === 0 ? 0 : (visiblePage - 1) * PAGE_SIZE + 1;
+  const lastVisibleLog = Math.min(visiblePage * PAGE_SIZE, filteredLogs.length);
 
   const handlePreview = (log: EmailDispatchLog) => {
     setSelectedLog(log);
@@ -159,7 +172,10 @@ export const LogEmailView: React.FC<LogEmailViewProps> = ({
             type="text"
             placeholder="Cari berdasarkan nama pegawai, email, atau no pengajuan..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-none"
           />
         </div>
@@ -168,7 +184,10 @@ export const LogEmailView: React.FC<LogEmailViewProps> = ({
           <Filter className="h-4 w-4 text-slate-400" />
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as any);
+              setCurrentPage(1);
+            }}
             className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 focus:border-slate-900 focus:outline-none"
           >
             <option value="all">Semua Status</option>
@@ -201,7 +220,7 @@ export const LogEmailView: React.FC<LogEmailViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => (
+                paginatedLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50/80 transition">
                     <td className="py-3 px-4 font-mono text-[11px] text-slate-500 whitespace-nowrap">
                       {new Date(log.timestamp).toLocaleString('id-ID', {
@@ -256,6 +275,38 @@ export const LogEmailView: React.FC<LogEmailViewProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+        <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-slate-500">
+            Menampilkan {firstVisibleLog}–{lastVisibleLog} dari {filteredLogs.length} log
+          </p>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage(visiblePage - 1)}
+                disabled={visiblePage === 1}
+                aria-label="Halaman sebelumnya"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Sebelumnya
+              </button>
+              <span className="text-xs text-slate-600">
+                Halaman {visiblePage} dari {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage(visiblePage + 1)}
+                disabled={visiblePage === totalPages}
+                aria-label="Halaman berikutnya"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Berikutnya
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

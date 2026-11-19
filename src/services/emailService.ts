@@ -1,5 +1,5 @@
 import { PengajuanKGB, Pegawai, EmailDispatchLog } from '../types';
-import { addEmailLog, addNotification } from './storage';
+import { addEmailLog, addNotification, getUsersList } from './storage';
 
 export interface EmailPayload {
   toEmail: string;
@@ -138,6 +138,20 @@ export function createMailtoUrl(toEmail: string, subject: string, bodyText: stri
   return `mailto:${encodeURIComponent(toEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`;
 }
 
+async function getNotificationUserId(pegawaiId: string, email: string): Promise<string> {
+  const users = await getUsersList();
+  const user = users.find((item) => item.pegawaiId === pegawaiId)
+    ?? users.find((item) =>
+      item.role === 'pegawai' && item.email.toLowerCase() === email.toLowerCase()
+    );
+
+  if (!user) {
+    throw new Error(`Akun pengguna untuk pegawai ${pegawaiId} tidak ditemukan; notifikasi tidak dapat dikirim.`);
+  }
+
+  return user.id;
+}
+
 // Main function to dispatch real-time email notifications
 export async function sendKgbStatusEmail(
   pengajuan: PengajuanKGB,
@@ -212,13 +226,15 @@ export async function sendKgbStatusEmail(
     timestamp: new Date().toISOString(),
   };
 
+  const notificationUserId = await getNotificationUserId(pengajuan.pegawaiId, pengajuan.emailPemohon);
+
   // Persist email log
   await addEmailLog(emailLog);
 
   // Also push in-app notification to the applicant
   await addNotification({
     id: `notif-${Date.now()}`,
-    userId: pengajuan.pegawaiId,
+    userId: notificationUserId,
     title: subject,
     message: pengajuan.catatanVerifikator || message.replace(/<[^>]*>?/gm, ''),
     type: actionType === 'disetujui' ? 'success' : actionType === 'perlu_perbaikan' ? 'warning' : actionType === 'ditolak' ? 'alert' : 'info',
@@ -365,6 +381,7 @@ Surel Resmi: kepegawaian@bawaslu-subang.go.id`.trim();
 export async function sendJadwalReminderEmail(pegawai: Pegawai, sisaHari: number): Promise<EmailDispatchLog> {
   const subject = `[SI-KGB Bawaslu Subang] Pengingat Jadwal Kenaikan Gaji Berkala (KGB) - ${pegawai.nama} (${sisaHari <= 0 ? 'Jatuh Tempo' : `H-${sisaHari}`})`;
   const snippet = `Pengingat jadwal KGB untuk ${pegawai.nama} (NIP: ${pegawai.nip}). TMT jatuh tempo pada ${pegawai.jadwalKgbBerikutnya} (${sisaHari <= 0 ? 'Jatuh tempo' : `${sisaHari} hari lagi`}).`;
+  const notificationUserId = await getNotificationUserId(pegawai.id, pegawai.email);
 
   const emailLog: EmailDispatchLog = {
     id: `elog-remind-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -379,7 +396,7 @@ export async function sendJadwalReminderEmail(pegawai: Pegawai, sisaHari: number
   await addEmailLog(emailLog);
   await addNotification({
     id: `notif-remind-${Date.now()}`,
-    userId: pegawai.id,
+    userId: notificationUserId,
     title: 'Pengingat Jadwal KGB Terdekat',
     message: `Jadwal KGB Anda jatuh tempo pada ${pegawai.jadwalKgbBerikutnya} (${sisaHari <= 0 ? 'Jatuh tempo' : `${sisaHari} hari lagi`}). Segera lengkapi dan ajukan berkas melalui SI-KGB!`,
     type: 'warning',

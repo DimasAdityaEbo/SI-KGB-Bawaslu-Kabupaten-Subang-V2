@@ -81,7 +81,7 @@ export interface PengajuanKGB {
 
 export interface NotificationItem {
   id: string;
-  userId?: string; // specific user or 'all_admin'
+  userId?: string; // References users.id; unset for broadcast notifications.
   title: string;
   message: string;
   type: 'info' | 'success' | 'warning' | 'alert';

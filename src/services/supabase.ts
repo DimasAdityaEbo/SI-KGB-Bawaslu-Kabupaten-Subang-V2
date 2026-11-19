@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS public.pengajuan_kgb (
 -- 4. Tabel Notifikasi
 CREATE TABLE IF NOT EXISTS public.notifikasi (
   id TEXT PRIMARY KEY,
-  user_id TEXT,
+  user_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   message TEXT NOT NULL,
   type TEXT NOT NULL DEFAULT 'info' CHECK (type IN ('info', 'success', 'warning', 'alert')),
